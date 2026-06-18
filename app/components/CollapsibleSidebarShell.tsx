@@ -60,12 +60,22 @@ export function CollapsibleSidebarShell({
         <div
           className={`shrink-0 flex items-center gap-3 ${
             sidebarCollapsed
-              ? "lg:flex-col lg:justify-start"
+              ? "lg:flex-col lg:items-center lg:justify-start lg:gap-2.5"
               : "justify-between"
           }`}
         >
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-black text-sm font-semibold text-white shadow-sm">
+          <div
+            className={`flex min-w-0 items-center gap-3 ${
+              sidebarCollapsed ? "lg:w-full lg:justify-center lg:gap-0" : ""
+            }`}
+          >
+            <div
+              className={`grid size-9 shrink-0 place-items-center rounded-xl bg-black text-sm font-semibold text-white shadow-sm transition-all duration-300 ease-in-out ${
+                sidebarCollapsed
+                  ? "lg:size-10 lg:rounded-[0.9rem] lg:shadow-[0_8px_22px_rgba(0,0,0,0.18)]"
+                  : ""
+              }`}
+            >
               BO
             </div>
             <div
@@ -86,7 +96,11 @@ export function CollapsibleSidebarShell({
 
           <button
             aria-label={sidebarCollapsed ? "Apri menu" : "Chiudi menu"}
-            className="grid size-9 shrink-0 place-items-center rounded-full border border-black/10 bg-white text-sm font-semibold text-zinc-700 shadow-sm transition hover:border-black/20 hover:bg-zinc-50"
+            className={`grid size-9 shrink-0 place-items-center rounded-full border border-black/10 bg-white text-sm font-semibold text-zinc-700 shadow-sm transition-all duration-300 ease-in-out hover:border-black/20 hover:bg-zinc-50 ${
+              sidebarCollapsed
+                ? "lg:size-10 lg:rounded-[0.9rem] lg:border-black/[0.08] lg:bg-zinc-50/80 lg:text-zinc-600 lg:shadow-[0_5px_16px_rgba(0,0,0,0.07)]"
+                : ""
+            }`}
             onClick={() => setSidebarCollapsed((current) => !current)}
             type="button"
           >
