@@ -5,7 +5,6 @@ import {
   BarChart3,
   BookOpen,
   CalendarCheck,
-  Check,
   LayoutDashboard,
   Megaphone,
   PanelLeft,
@@ -28,13 +27,6 @@ const navigation: Array<{ href: string; icon: LucideIcon; label: string }> = [
   { href: "/opportunita-ai", icon: Target, label: "Opportunità AI" },
   { href: "/impostazioni-ai", icon: Sparkles, label: "Impostazioni AI" },
   { href: "/impostazioni", icon: Settings, label: "Impostazioni" },
-];
-
-const systemStatus = [
-  "CRM aggiornato",
-  "AI attiva",
-  "WhatsApp collegato",
-  "Database sincronizzato",
 ];
 
 type CollapsibleSidebarShellProps = {
@@ -162,31 +154,6 @@ export function CollapsibleSidebarShell({
 
           <div className="mt-4 lg:hidden">
             <SidebarAccountPanel />
-          </div>
-
-          <div
-            className={`mt-6 hidden overflow-hidden rounded-[1.25rem] border border-black/10 bg-[#fafafa] shadow-[0_18px_60px_rgba(0,0,0,0.06)] transition-all duration-300 lg:block ${
-              sidebarCollapsed
-                ? "pointer-events-none h-0 border-transparent p-0 opacity-0"
-                : "h-auto p-4 opacity-100"
-            }`}
-          >
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-zinc-400">
-              Stato sistema
-            </p>
-            <div className="mt-4 space-y-2 text-sm leading-6 text-zinc-700">
-              {systemStatus.map((item) => (
-                <p className="flex items-center gap-2" key={item}>
-                  <Check
-                    aria-hidden="true"
-                    className="shrink-0 text-zinc-700"
-                    size={14}
-                    strokeWidth={2}
-                  />
-                  <span>{item}</span>
-                </p>
-              ))}
-            </div>
           </div>
         </div>
 

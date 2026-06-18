@@ -6,8 +6,9 @@ import {
   buildOverviewActions,
   type OverviewVisit,
 } from "@/lib/overviewActions";
-import { PageHeader, PageShell } from "./components/BeautyUi";
+import { PageShell } from "./components/BeautyUi";
 import OverviewAgendaActionsList from "./OverviewAgendaActionsList";
+import OverviewTodayPerformance from "./OverviewTodayPerformance";
 import {
   type Customer,
   formatCompactCurrency,
@@ -43,6 +44,21 @@ function getMoneyValue(value: number | string | null | undefined) {
 
 function getEstimatedRecovery(totalSpent: number, recoveryProbability: number) {
   return Math.round((totalSpent * recoveryProbability) / 100);
+}
+
+function getDaysSinceLastVisit(lastVisitDate: string) {
+  if (!lastVisitDate) {
+    return null;
+  }
+
+  const lastVisit = new Date(`${lastVisitDate}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return Math.max(
+    0,
+    Math.round((today.getTime() - lastVisit.getTime()) / 86_400_000),
+  );
 }
 
 function cleanWhatsAppPhone(phone: string) {
@@ -277,7 +293,14 @@ export default async function Home() {
       ),
     }))
     .sort((first, second) => second.estimatedRecovery - first.estimatedRecovery);
+  const estimatedRecoverableRevenue = prioritizedRecoverableCustomers.reduce(
+    (total, customer) => total + customer.estimatedRecovery,
+    0,
+  );
   const mainPriority = prioritizedRecoverableCustomers[0];
+  const mainPriorityDaysSinceLastVisit = mainPriority
+    ? getDaysSinceLastVisit(mainPriority.lastVisitDate)
+    : null;
   const mainPriorityWhatsAppHref = mainPriority
     ? getWhatsAppHref(mainPriority)
     : "";
@@ -288,26 +311,6 @@ export default async function Home() {
     customers,
     visits: overviewVisits,
   });
-  const quickKpis = [
-    {
-      detail: "Clienti a rischio e persi",
-      href: "/opportunita-ai",
-      label: "Oggi puoi recuperare",
-      value: formatCompactCurrency(recoverableValue),
-    },
-    {
-      detail: "Persone da gestire oggi",
-      href: "/agenda-ai",
-      label: "Clienti da contattare",
-      value: `${recoverableCustomers.length}`,
-    },
-    {
-      detail: "Visite registrate nel mese corrente",
-      href: "/fatturato",
-      label: "Fatturato mese",
-      value: formatCompactCurrency(monthRevenue),
-    },
-  ];
   const activeRatio =
     totalCustomers > 0 ? Math.round((activeCustomers / totalCustomers) * 100) : 0;
   const customerBaseStatus =
@@ -344,138 +347,169 @@ export default async function Home() {
       sidebarEyebrow="Panoramica"
       sidebarText="Apri Beauty OS ogni mattina per capire chi contattare, quanto puoi recuperare e dove agire."
     >
-      <PageHeader
-        actions={
-          <Link
-            className="rounded-full bg-black px-5 py-2.5 text-sm font-medium text-white shadow-[0_14px_35px_rgba(0,0,0,0.22)] transition hover:bg-zinc-800"
-            href="/opportunita-ai"
-          >
-            Apri priorità
-          </Link>
-        }
-        eyebrow="Panoramica"
-        subtitle="La tua agenda intelligente per recuperare clienti e fatturato."
-        title="Beauty OS"
-      />
-
       <section className="py-6">
-        <article className="overflow-hidden rounded-[1.75rem] border border-black/10 bg-white shadow-[0_28px_90px_rgba(0,0,0,0.08)]">
-          <div className="grid gap-0 lg:grid-cols-[1.1fr_0.9fr]">
-            <div className="p-6 sm:p-7 lg:p-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.26em] text-zinc-400">
-                Priorità di oggi
+        <article className="overflow-hidden rounded-[2rem] border border-black/10 bg-white shadow-[0_30px_100px_rgba(0,0,0,0.09)]">
+          <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[1.35fr_0.65fr] lg:items-end lg:p-10">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-zinc-400">
+                Panoramica · Oggi
               </p>
-              {mainPriority ? (
-                <>
-                  <div className="mt-5 flex flex-wrap items-center gap-3">
-                    <h2 className="text-3xl font-semibold tracking-tight text-black sm:text-4xl">
-                      {mainPriority.name}
-                    </h2>
-                    <span className="whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">
-                      {statusLabels[mainPriority.status]}
-                    </span>
-                  </div>
-                  <p className="mt-4 max-w-xl text-base leading-7 text-zinc-600">
-                    {mainPriorityReason}
-                  </p>
-                  <div className="mt-7 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-[1.15rem] border border-black/10 bg-[#f7f7f5] p-4">
-                      <p className="text-xs font-medium uppercase tracking-[0.2em] text-zinc-400">
-                        Valore recuperabile stimato
-                      </p>
-                      <p className="mt-3 text-3xl font-semibold tracking-tight text-black">
-                        {formatCompactCurrency(mainPriority.estimatedRecovery)}
-                      </p>
-                    </div>
-                    <div className="rounded-[1.15rem] border border-black/10 bg-[#f7f7f5] p-4">
-                      <p className="text-xs font-medium uppercase tracking-[0.2em] text-zinc-400">
-                        Probabilità
-                      </p>
-                      <p className="mt-3 text-3xl font-semibold tracking-tight text-black">
-                        {mainPriority.recoveryProbability}%
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                    {mainPriorityWhatsAppHref ? (
-                      <a
-                        className="inline-flex items-center justify-center rounded-full bg-black px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition hover:bg-zinc-800"
-                        href={mainPriorityWhatsAppHref}
-                        rel="noreferrer"
-                        target="_blank"
-                      >
-                        Apri WhatsApp
-                      </a>
-                    ) : (
-                      <span className="inline-flex cursor-not-allowed items-center justify-center rounded-full bg-zinc-200 px-5 py-3 text-sm font-semibold text-zinc-500">
-                        Telefono mancante
-                      </span>
-                    )}
-                    <Link
-                      className="inline-flex items-center justify-center rounded-full border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-black transition hover:border-black/20 hover:bg-zinc-50"
-                      href={`/clients/${mainPriority.id}`}
-                    >
-                      Apri profilo
-                    </Link>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h2 className="mt-5 text-3xl font-semibold tracking-tight text-black sm:text-4xl">
-                    Nessuna priorità critica oggi
-                  </h2>
-                  <p className="mt-4 max-w-xl text-base leading-7 text-zinc-600">
-                    La base clienti non mostra recuperi urgenti. Mantieni i
-                    profili aggiornati per far emergere nuove opportunità.
-                  </p>
-                  <Link
-                    className="mt-7 inline-flex rounded-full bg-black px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition hover:bg-zinc-800"
-                    href="/clients"
-                  >
-                    Vai ai clienti
-                  </Link>
-                </>
-              )}
+              <h1 className="mt-5 text-2xl font-semibold tracking-tight text-black sm:text-3xl">
+                Recupero stimato oggi
+              </h1>
+              <p className="mt-4 text-5xl font-semibold tracking-[-0.05em] text-black sm:text-6xl lg:text-7xl">
+                {formatCompactCurrency(estimatedRecoverableRevenue)}
+              </p>
+              <p className="mt-5 max-w-xl text-sm leading-6 text-zinc-500 sm:text-base">
+                Valore recuperabile stimato sui clienti a rischio e persi,
+                ponderato sulla probabilità di ritorno.
+              </p>
+              <Link
+                className="mt-7 inline-flex items-center justify-center rounded-full bg-black px-6 py-3 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition hover:-translate-y-0.5 hover:bg-zinc-800"
+                href="/opportunita-ai"
+              >
+                Recupera clienti
+              </Link>
             </div>
-            <div className="border-t border-black/10 bg-black p-6 text-white sm:p-7 lg:border-l lg:border-t-0 lg:p-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.26em] text-zinc-500">
-                Cosa fare adesso
-              </p>
-              <h3 className="mt-4 text-2xl font-semibold tracking-tight">
-                {mainPriority
-                  ? "Invia un messaggio breve e porta il cliente alla prossima prenotazione."
-                  : "La giornata parte senza urgenze critiche."}
-              </h3>
-              <p className="mt-5 text-sm leading-6 text-zinc-300">
-                {mainPriority
-                  ? `${statusLabels[mainPriority.status]} · ${formatCompactCurrency(mainPriority.totalSpentValue)} valore storico · ${mainPriority.recoveryProbability}% probabilità di recupero.`
-                  : "Controlla i clienti e registra nuove visite per mantenere i dati affidabili."}
-              </p>
+            <div className="grid grid-cols-3 gap-2 border-t border-black/10 pt-6 lg:grid-cols-1 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+              {[
+                [recoverableCustomers.length, "Da contattare"],
+                [atRiskCustomers, "A rischio"],
+                [lostCustomers, "Da riattivare"],
+              ].map(([value, label]) => (
+                <div
+                  className="min-w-0 rounded-[1.15rem] bg-[#f7f7f5] p-3 sm:p-4"
+                  key={label}
+                >
+                  <p className="text-3xl font-semibold tracking-tight text-black">
+                    {value}
+                  </p>
+                  <p className="mt-2 text-xs font-medium leading-5 text-zinc-500">
+                    {label}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
         </article>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        {quickKpis.map((kpi) => (
-          <Link
-            className="group cursor-pointer rounded-[1.35rem] border border-black/10 bg-white p-5 shadow-[0_18px_55px_rgba(0,0,0,0.06)] transition hover:-translate-y-0.5 hover:border-black/20 hover:shadow-[0_24px_70px_rgba(0,0,0,0.09)]"
-            href={kpi.href}
-            key={kpi.label}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <p className="text-sm font-medium text-zinc-500">{kpi.label}</p>
-              <span className="text-sm font-semibold text-black transition group-hover:translate-x-0.5">
-                Apri
-              </span>
+      <OverviewTodayPerformance
+        actions={agendaActions}
+        customers={customers}
+        estimatedRecoverableRevenue={estimatedRecoverableRevenue}
+        variant="kpis"
+        visits={overviewVisits}
+      />
+
+      <section className="mt-6 overflow-hidden rounded-[1.75rem] bg-black text-white shadow-[0_28px_90px_rgba(0,0,0,0.2)]">
+        <div className="p-5 sm:p-6">
+          <div className="flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.26em] text-zinc-500">
+                Raccomandazione AI
+              </p>
+              <h2 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">
+                {mainPriority
+                  ? `${mainPriority.name} è la priorità con il maggiore impatto.`
+                  : "Nessuna azione di recupero urgente."}
+              </h2>
             </div>
-            <p className="mt-6 break-words text-3xl font-semibold tracking-tight text-black">
-              {kpi.value}
-            </p>
-            <p className="mt-3 text-sm leading-6 text-zinc-500">{kpi.detail}</p>
-          </Link>
-        ))}
+            {mainPriority ? (
+              <span className="w-fit shrink-0 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white">
+                {statusLabels[mainPriority.status]}
+              </span>
+            ) : null}
+          </div>
+
+          {mainPriority ? (
+            <>
+              <div className="grid gap-px overflow-hidden rounded-[1.15rem] bg-white/10 sm:grid-cols-3">
+                {[
+                  [
+                    "Ultima visita",
+                    mainPriorityDaysSinceLastVisit === null
+                      ? "Dato non disponibile"
+                      : `${mainPriorityDaysSinceLastVisit} giorni fa`,
+                  ],
+                  [
+                    "Valore storico",
+                    formatCompactCurrency(mainPriority.totalSpentValue),
+                  ],
+                  [
+                    "Probabilità di recupero",
+                    `${mainPriority.recoveryProbability}%`,
+                  ],
+                ].map(([label, value]) => (
+                  <div className="bg-black p-4 sm:p-5" key={label}>
+                    <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                      {label}
+                    </p>
+                    <p className="mt-2 text-lg font-semibold tracking-tight text-white">
+                      {value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                    Azione consigliata
+                  </p>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-300">
+                    {mainPriorityReason} Invia un messaggio personale e proponi
+                    una nuova prenotazione oggi.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  {mainPriorityWhatsAppHref ? (
+                    <a
+                      className="inline-flex items-center justify-center rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-zinc-200"
+                      href={mainPriorityWhatsAppHref}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Apri WhatsApp
+                    </a>
+                  ) : (
+                    <span className="inline-flex cursor-not-allowed items-center justify-center rounded-full bg-zinc-800 px-5 py-2.5 text-sm font-semibold text-zinc-500">
+                      Telefono mancante
+                    </span>
+                  )}
+                  <Link
+                    className="inline-flex items-center justify-center rounded-full border border-white/15 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+                    href={`/clients/${mainPriority.id}`}
+                  >
+                    Apri profilo
+                  </Link>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="pt-4">
+              <p className="max-w-2xl text-base leading-7 text-zinc-300">
+                La base clienti non mostra recuperi urgenti. Mantieni visite e
+                profili aggiornati per far emergere nuove opportunità.
+              </p>
+              <Link
+                className="mt-6 inline-flex rounded-full bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-zinc-200"
+                href="/clients"
+              >
+                Vai ai clienti
+              </Link>
+            </div>
+          )}
+        </div>
       </section>
+
+      <OverviewTodayPerformance
+        actions={agendaActions}
+        customers={customers}
+        estimatedRecoverableRevenue={estimatedRecoverableRevenue}
+        variant="progress"
+        visits={overviewVisits}
+      />
 
       <section className="mt-6 rounded-[1.5rem] border border-black/10 bg-white p-5 shadow-[0_22px_70px_rgba(0,0,0,0.07)]">
         <div className="border-b border-black/10 pb-5">
@@ -491,6 +525,33 @@ export default async function Home() {
           customers={customers}
           visits={overviewVisits}
         />
+      </section>
+
+      <section className="mt-6">
+        <div className="mb-3">
+          <p className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-400">
+            Andamento del mese
+          </p>
+        </div>
+        <Link
+          className="group flex flex-col gap-5 rounded-[1.35rem] border border-black/10 bg-white p-5 shadow-[0_18px_55px_rgba(0,0,0,0.06)] transition hover:-translate-y-0.5 hover:border-black/20 sm:flex-row sm:items-end sm:justify-between"
+          href="/fatturato"
+        >
+          <div>
+            <p className="text-sm font-medium text-zinc-500">
+              Fatturato mese corrente
+            </p>
+            <p className="mt-4 text-4xl font-semibold tracking-tight text-black">
+              {formatCompactCurrency(monthRevenue)}
+            </p>
+            <p className="mt-3 text-sm leading-6 text-zinc-500">
+              Visite registrate nel mese corrente
+            </p>
+          </div>
+          <span className="text-sm font-semibold text-black transition group-hover:translate-x-0.5">
+            Apri fatturato
+          </span>
+        </Link>
       </section>
 
       <section className="mt-6">

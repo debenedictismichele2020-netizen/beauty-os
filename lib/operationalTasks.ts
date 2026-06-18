@@ -308,6 +308,7 @@ export function saveOperationalTasks(
     operationalTasksStorageKey,
     JSON.stringify(normalizedTasks),
   );
+  window.dispatchEvent(new Event("beauty-os-operational-tasks-updated"));
 
   if (options.syncRemote !== false) {
     void upsertOperationalTasksToSupabase(normalizedTasks);

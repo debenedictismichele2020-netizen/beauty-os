@@ -3,14 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import {
-  getTodayDateKey,
-  readOperationalTasks,
-  type OperationalTask,
-} from "@/lib/operationalTasks";
+import { readOperationalTasks } from "@/lib/operationalTasks";
 import {
   buildOverviewActions,
-  getOverviewActionStatus,
   type OverviewAction,
   type OverviewCustomer,
   type OverviewVisit,
@@ -43,9 +38,6 @@ export default function OverviewAgendaActionsList({
   customers,
   visits,
 }: OverviewAgendaActionsListProps) {
-  const [operationalTasks, setOperationalTasks] = useState<OperationalTask[]>(
-    [],
-  );
   const [runtimeActions, setRuntimeActions] =
     useState<OverviewAgendaAction[]>(actions);
 
@@ -54,7 +46,6 @@ export default function OverviewAgendaActionsList({
       const nextOperationalTasks = readOperationalTasks();
       const nextServices = getActiveServices(readServiceCatalog());
 
-      setOperationalTasks(nextOperationalTasks);
       setRuntimeActions(
         buildOverviewActions({
           customers,
@@ -69,11 +60,19 @@ export default function OverviewAgendaActionsList({
     window.addEventListener("storage", refreshActions);
     window.addEventListener("focus", refreshActions);
     window.addEventListener("beauty-os-customer-managed", refreshActions);
+    window.addEventListener(
+      "beauty-os-operational-tasks-updated",
+      refreshActions,
+    );
 
     return () => {
       window.removeEventListener("storage", refreshActions);
       window.removeEventListener("focus", refreshActions);
       window.removeEventListener("beauty-os-customer-managed", refreshActions);
+      window.removeEventListener(
+        "beauty-os-operational-tasks-updated",
+        refreshActions,
+      );
     };
   }, [customers, visits]);
 
@@ -81,49 +80,6 @@ export default function OverviewAgendaActionsList({
     () => runtimeActions.slice(0, 4),
     [runtimeActions],
   );
-  const completedToday = operationalTasks.filter(
-    (task) => task.status === "completed" && task.date === getTodayDateKey(),
-  ).length;
-  const actionStatus = getOverviewActionStatus({
-    actionCount: visibleActions.length,
-    completedToday,
-  });
-
-  const statusBlock =
-    actionStatus.totalToday > 0 ? (
-      <div className="mt-4 rounded-[1.15rem] border border-black/10 bg-white p-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">
-              Operatività oggi
-            </p>
-            <p className="mt-2 text-sm font-semibold text-black">
-              {actionStatus.completedToday} / {actionStatus.totalToday} azioni
-              completate
-            </p>
-          </div>
-          <span className="text-sm font-semibold text-zinc-700">
-            {actionStatus.percentage}%
-          </span>
-        </div>
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-100">
-          <div
-            className="h-full rounded-full bg-black transition-all"
-            style={{ width: `${actionStatus.percentage}%` }}
-          />
-        </div>
-      </div>
-    ) : (
-      <div className="mt-4 rounded-[1.15rem] border border-black/10 bg-white p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">
-          Operatività oggi
-        </p>
-        <p className="mt-2 text-sm font-semibold text-black">
-          0 azioni urgenti
-        </p>
-      </div>
-    );
-
   const actionsBlock = useMemo(
     () =>
       visibleActions.length === 0 ? (
@@ -165,12 +121,7 @@ export default function OverviewAgendaActionsList({
     [visibleActions],
   );
 
-  return (
-    <>
-      {statusBlock}
-      {actionsBlock}
-    </>
-  );
+  return actionsBlock;
 }
 
 function AgendaActionContent({ action }: { action: OverviewAgendaAction }) {
