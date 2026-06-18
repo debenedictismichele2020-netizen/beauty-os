@@ -11,18 +11,12 @@ type SidebarAccountState = {
   salonName: string;
 };
 
-type SidebarAccountPanelProps = {
-  compact?: boolean;
-};
-
 const fallbackAccount: SidebarAccountState = {
   email: "Account",
   salonName: "Studio Beauty",
 };
 
-export default function SidebarAccountPanel({
-  compact = false,
-}: SidebarAccountPanelProps) {
+export default function SidebarAccountPanel() {
   const router = useRouter();
   const [account, setAccount] =
     useState<SidebarAccountState>(fallbackAccount);
@@ -70,23 +64,20 @@ export default function SidebarAccountPanel({
 
   return (
     <div
-      className={`flex items-center rounded-[1.15rem] border border-black/10 bg-white shadow-sm ${
-        compact ? "flex-col gap-2 p-2" : "gap-3 p-3"
-      }`}
+      className="flex min-w-0 items-center gap-3 rounded-[1.15rem] bg-white p-3 shadow-sm"
+      style={{ border: "2px solid red" }}
     >
       <div className="grid size-9 shrink-0 place-items-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-700">
         {initials}
       </div>
-      {!compact ? (
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-black">
-            {account.email}
-          </p>
-          <p className="truncate text-xs text-zinc-500">
-            {account.salonName}
-          </p>
-        </div>
-      ) : null}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-black">
+          {account.email}
+        </p>
+        <p className="truncate text-xs text-zinc-500">
+          {account.salonName}
+        </p>
+      </div>
       <button
         aria-label="Esci"
         className="grid size-8 shrink-0 place-items-center rounded-full border border-black/10 text-zinc-600 transition hover:border-black/20 hover:bg-zinc-50 hover:text-black"

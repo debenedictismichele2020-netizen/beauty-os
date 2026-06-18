@@ -177,7 +177,7 @@ export function CollapsibleSidebarShell({
             </div>
           </div>
 
-          <SidebarAccountPanel compact={sidebarCollapsed} />
+          <SidebarAccountPanel />
         </div>
       </aside>
 
