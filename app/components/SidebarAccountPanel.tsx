@@ -11,31 +11,43 @@ type SidebarAccountState = {
   salonName: string;
 };
 
-export default function SidebarAccountPanel() {
+type SidebarAccountPanelProps = {
+  compact?: boolean;
+};
+
+const fallbackAccount: SidebarAccountState = {
+  email: "Account",
+  salonName: "Studio Beauty",
+};
+
+export default function SidebarAccountPanel({
+  compact = false,
+}: SidebarAccountPanelProps) {
   const router = useRouter();
-  const [account, setAccount] = useState<SidebarAccountState | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [account, setAccount] =
+    useState<SidebarAccountState>(fallbackAccount);
 
   useEffect(() => {
     let isMounted = true;
 
     async function loadAccount() {
-      const user = await getCurrentUser();
-      const salon = user ? await ensureUserSalon() : null;
+      try {
+        const user = await getCurrentUser();
+        const salon = user ? await ensureUserSalon() : null;
 
-      if (!isMounted) {
-        return;
+        if (!isMounted) {
+          return;
+        }
+
+        setAccount({
+          email: user?.email ?? fallbackAccount.email,
+          salonName: salon?.name ?? fallbackAccount.salonName,
+        });
+      } catch {
+        if (isMounted) {
+          setAccount(fallbackAccount);
+        }
       }
-
-      setAccount(
-        user
-          ? {
-              email: user.email ?? "Utente Beauty OS",
-              salonName: salon?.name ?? "Studio Beauty",
-            }
-          : null,
-      );
-      setIsLoading(false);
     }
 
     void loadAccount();
@@ -51,29 +63,39 @@ export default function SidebarAccountPanel() {
     router.refresh();
   }
 
+  const initials =
+    account.email === fallbackAccount.email
+      ? "DE"
+      : account.email.slice(0, 2).toUpperCase();
+
   return (
-    <div className="flex items-center gap-3 rounded-[1.15rem] border border-black/10 bg-white p-3 shadow-sm">
+    <div
+      className={`flex items-center rounded-[1.15rem] border border-black/10 bg-white shadow-sm ${
+        compact ? "flex-col gap-2 p-2" : "gap-3 p-3"
+      }`}
+    >
       <div className="grid size-9 shrink-0 place-items-center rounded-full bg-zinc-100 text-sm font-semibold text-zinc-700">
-        {account?.email ? account.email.slice(0, 2).toUpperCase() : "OS"}
+        {initials}
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-black">
-          {isLoading ? "Verifica accesso..." : account?.email ?? "Accesso richiesto"}
-        </p>
-        <p className="truncate text-xs text-zinc-500">
-          {account?.salonName ?? "Studio Beauty"}
-        </p>
-      </div>
-      {account ? (
-        <button
-          aria-label="Esci"
-          className="grid size-8 shrink-0 place-items-center rounded-full border border-black/10 text-zinc-600 transition hover:border-black/20 hover:bg-zinc-50 hover:text-black"
-          onClick={handleSignOut}
-          type="button"
-        >
-          <LogOut aria-hidden="true" size={15} strokeWidth={2} />
-        </button>
+      {!compact ? (
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-black">
+            {account.email}
+          </p>
+          <p className="truncate text-xs text-zinc-500">
+            {account.salonName}
+          </p>
+        </div>
       ) : null}
+      <button
+        aria-label="Esci"
+        className="grid size-8 shrink-0 place-items-center rounded-full border border-black/10 text-zinc-600 transition hover:border-black/20 hover:bg-zinc-50 hover:text-black"
+        onClick={handleSignOut}
+        title="Esci"
+        type="button"
+      >
+        <LogOut aria-hidden="true" size={15} strokeWidth={2} />
+      </button>
     </div>
   );
 }

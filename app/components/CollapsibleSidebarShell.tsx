@@ -145,14 +145,20 @@ export function CollapsibleSidebarShell({
           })}
         </nav>
 
+        <div className="mt-4 lg:hidden">
+          <SidebarAccountPanel />
+        </div>
+
         <div
-          className={`mt-auto hidden space-y-4 pt-6 transition-all duration-300 ease-in-out lg:block ${
-            sidebarCollapsed
-              ? "lg:pointer-events-none lg:opacity-0"
-              : "opacity-100"
-          }`}
+          className="mt-auto hidden space-y-4 pt-6 transition-all duration-300 ease-in-out lg:block"
         >
-          <div className="rounded-[1.25rem] border border-black/10 bg-[#fafafa] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.06)]">
+          <div
+            className={`overflow-hidden rounded-[1.25rem] border border-black/10 bg-[#fafafa] shadow-[0_18px_60px_rgba(0,0,0,0.06)] transition-all duration-300 ${
+              sidebarCollapsed
+                ? "pointer-events-none h-0 border-transparent p-0 opacity-0"
+                : "h-auto p-4 opacity-100"
+            }`}
+          >
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-zinc-400">
               Stato sistema
             </p>
@@ -171,12 +177,12 @@ export function CollapsibleSidebarShell({
             </div>
           </div>
 
-          <SidebarAccountPanel />
+          <SidebarAccountPanel compact={sidebarCollapsed} />
         </div>
       </aside>
 
       <section
-        className={`min-w-0 px-5 pb-5 pt-28 transition-[margin,padding] duration-300 ease-in-out sm:px-8 lg:px-10 lg:py-8 ${
+        className={`min-w-0 px-5 pb-5 pt-56 transition-[margin,padding] duration-300 ease-in-out sm:px-8 lg:px-10 lg:py-8 ${
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-[280px]"
         }`}
       >
