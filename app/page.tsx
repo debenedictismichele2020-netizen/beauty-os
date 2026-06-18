@@ -42,7 +42,14 @@ function getMoneyValue(value: number | string | null | undefined) {
   return Number.isFinite(amount) ? amount : 0;
 }
 
-function getEstimatedRecovery(totalSpent: number, recoveryProbability: number) {
+function getEstimatedRecovery(customer: Customer) {
+  const totalSpent = Number(customer.totalSpentValue ?? 0);
+  const recoveryProbability = Number(customer.recoveryProbability ?? 0);
+
+  if (!Number.isFinite(totalSpent) || !Number.isFinite(recoveryProbability)) {
+    return 0;
+  }
+
   return Math.round((totalSpent * recoveryProbability) / 100);
 }
 
@@ -282,10 +289,7 @@ export default async function Home() {
   const prioritizedRecoverableCustomers = recoverableCustomers
     .map((customer) => ({
       ...customer,
-      estimatedRecovery: getEstimatedRecovery(
-        customer.totalSpentValue,
-        customer.recoveryProbability,
-      ),
+      estimatedRecovery: getEstimatedRecovery(customer),
       priorityLevel: getPriorityLevel(
         customer.totalSpentValue,
         customer.recoveryProbability,
