@@ -49,16 +49,16 @@ export function CollapsibleSidebarShell({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <main className="min-h-screen bg-[#f7f7f5] text-zinc-950">
+    <main className="min-h-screen overflow-x-hidden bg-[#f7f7f5] text-zinc-950">
       <aside
-        className={`fixed inset-x-0 top-0 z-40 flex flex-col border-b border-black/10 bg-white/95 px-5 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.06)] backdrop-blur transition-[width,padding] duration-300 ease-in-out lg:inset-y-0 lg:left-0 lg:right-auto lg:h-screen lg:border-b-0 lg:border-r lg:py-7 ${
+        className={`fixed inset-x-0 top-0 z-40 flex max-h-screen flex-col overflow-hidden border-b border-black/10 bg-white/95 px-5 py-4 shadow-[0_18px_60px_rgba(0,0,0,0.06)] backdrop-blur transition-[width,padding] duration-300 ease-in-out lg:inset-y-0 lg:left-0 lg:right-auto lg:h-screen lg:max-h-screen lg:border-b-0 lg:border-r lg:py-5 ${
           sidebarCollapsed
             ? "lg:w-20 lg:px-3"
             : "lg:w-[280px] lg:px-6"
         }`}
       >
         <div
-          className={`flex items-center gap-3 ${
+          className={`shrink-0 flex items-center gap-3 ${
             sidebarCollapsed
               ? "lg:flex-col lg:justify-start"
               : "justify-between"
@@ -94,66 +94,64 @@ export function CollapsibleSidebarShell({
           </button>
         </div>
 
-        <nav
-          className={`mt-6 flex gap-2 overflow-x-auto pb-1 transition-all duration-300 ease-in-out lg:mt-10 lg:flex-col lg:overflow-visible lg:pb-0 ${
-            sidebarCollapsed ? "lg:items-center" : ""
-          }`}
-        >
-          {navigation.map((item) => {
-            const isActive = item.label === active;
-            const Icon = item.icon;
+        <div className="min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
+          <nav
+            className={`mt-6 flex gap-2 overflow-x-auto pb-1 transition-all duration-300 ease-in-out lg:mt-8 lg:flex-col lg:overflow-visible lg:pb-0 ${
+              sidebarCollapsed ? "lg:items-center" : ""
+            }`}
+          >
+            {navigation.map((item) => {
+              const isActive = item.label === active;
+              const Icon = item.icon;
 
-            return (
-              <Link
-                aria-label={item.label}
-                className={`group relative flex h-11 shrink-0 items-center rounded-full text-sm font-medium transition ${
-                  sidebarCollapsed
-                    ? "w-11 justify-center px-0"
-                    : "justify-start gap-3 px-4"
-                } ${
-                  isActive
-                    ? "bg-black text-white shadow-sm"
-                    : "text-[#6b7280] hover:bg-[#f5f5f5] hover:text-[#111111]"
-                }`}
-                href={item.href}
-                key={item.label}
-                title={sidebarCollapsed ? item.label : undefined}
-              >
-                <span className="grid size-5 shrink-0 place-items-center">
-                  <Icon
-                    aria-hidden="true"
-                    size={18}
-                    strokeWidth={2}
-                  />
-                </span>
-                <span
-                  className={`whitespace-nowrap transition-all duration-300 ease-in-out ${
+              return (
+                <Link
+                  aria-label={item.label}
+                  className={`group relative flex h-11 shrink-0 items-center rounded-full text-sm font-medium transition ${
                     sidebarCollapsed
-                      ? "lg:w-0 lg:overflow-hidden lg:opacity-0"
-                      : "opacity-100"
+                      ? "w-11 justify-center px-0"
+                      : "justify-start gap-3 px-4"
+                  } ${
+                    isActive
+                      ? "bg-black text-white shadow-sm"
+                      : "text-[#6b7280] hover:bg-[#f5f5f5] hover:text-[#111111]"
                   }`}
+                  href={item.href}
+                  key={item.label}
+                  title={sidebarCollapsed ? item.label : undefined}
                 >
-                  {item.label}
-                </span>
-                {sidebarCollapsed ? (
-                  <span className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-lg border border-black/10 bg-black px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-[0_18px_50px_rgba(0,0,0,0.2)] transition duration-200 group-hover:opacity-100 lg:block">
+                  <span className="grid size-5 shrink-0 place-items-center">
+                    <Icon
+                      aria-hidden="true"
+                      size={18}
+                      strokeWidth={2}
+                    />
+                  </span>
+                  <span
+                    className={`whitespace-nowrap transition-all duration-300 ease-in-out ${
+                      sidebarCollapsed
+                        ? "lg:w-0 lg:overflow-hidden lg:opacity-0"
+                        : "opacity-100"
+                    }`}
+                  >
                     {item.label}
                   </span>
-                ) : null}
-              </Link>
-            );
-          })}
-        </nav>
+                  {sidebarCollapsed ? (
+                    <span className="pointer-events-none absolute left-[calc(100%+12px)] top-1/2 z-50 hidden -translate-y-1/2 whitespace-nowrap rounded-lg border border-black/10 bg-black px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-[0_18px_50px_rgba(0,0,0,0.2)] transition duration-200 group-hover:opacity-100 lg:block">
+                      {item.label}
+                    </span>
+                  ) : null}
+                </Link>
+              );
+            })}
+          </nav>
 
-        <div className="mt-4 lg:hidden">
-          <SidebarAccountPanel />
-        </div>
+          <div className="mt-4 lg:hidden">
+            <SidebarAccountPanel />
+          </div>
 
-        <div
-          className="mt-auto hidden space-y-4 pt-6 transition-all duration-300 ease-in-out lg:block"
-        >
           <div
-            className={`overflow-hidden rounded-[1.25rem] border border-black/10 bg-[#fafafa] shadow-[0_18px_60px_rgba(0,0,0,0.06)] transition-all duration-300 ${
+            className={`mt-6 hidden overflow-hidden rounded-[1.25rem] border border-black/10 bg-[#fafafa] shadow-[0_18px_60px_rgba(0,0,0,0.06)] transition-all duration-300 lg:block ${
               sidebarCollapsed
                 ? "pointer-events-none h-0 border-transparent p-0 opacity-0"
                 : "h-auto p-4 opacity-100"
@@ -176,8 +174,10 @@ export function CollapsibleSidebarShell({
               ))}
             </div>
           </div>
+        </div>
 
-          <SidebarAccountPanel />
+        <div className="hidden shrink-0 pt-4 lg:block">
+          <SidebarAccountPanel compact={sidebarCollapsed} />
         </div>
       </aside>
 
