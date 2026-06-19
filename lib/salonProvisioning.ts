@@ -179,6 +179,41 @@ async function getExistingMembership(
   return chooseCanonicalMembership(data ?? []);
 }
 
+export async function resolveExistingSalonForUser(
+  user: User,
+): Promise<ProvisionedSalon | null> {
+  const supabase = createSupabaseAdminClient();
+
+  if (!supabase) {
+    return null;
+  }
+
+  const existingMembership = await getExistingMembership(supabase, user.id);
+
+  if (existingMembership?.salon_id) {
+    const { data: existingSalon, error: salonReadError } = await supabase
+      .from("salons")
+      .select("id,name,slug,owner_user_id,deleted_at,created_at")
+      .eq("id", existingMembership.salon_id)
+      .is("deleted_at", null)
+      .maybeSingle<SalonRow>();
+
+    if (salonReadError) {
+      throw new Error(salonReadError.message);
+    }
+
+    const mappedSalon = mapSalon(existingSalon, existingMembership);
+
+    if (mappedSalon) {
+      return mappedSalon;
+    }
+  }
+
+  const existingOwnedSalon = await getOwnedSalon(supabase, user.id);
+
+  return mapSalon(existingOwnedSalon, { role: "owner" });
+}
+
 export async function ensureSalonForUser(
   user: User,
 ): Promise<ProvisionedSalon | null> {
