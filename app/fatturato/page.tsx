@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentSalon } from "@/lib/currentSalon";
 import { PageShell } from "../components/BeautyUi";
 import { formatCompactCurrency } from "../clients/data";
 
@@ -259,8 +260,9 @@ function getWeekLabel(weekKey: string) {
 
 async function getCustomers() {
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     throw new Error(
       "Configurazione Supabase non valida. Controlla le variabili ambiente.",
     );
@@ -268,7 +270,10 @@ async function getCustomers() {
 
   let selectFields =
     "id,first_name,last_name,birth_date,ai_status,total_spent,recovery_probability";
-  const { data, error } = await supabase.from("customers").select(selectFields);
+  const { data, error } = await supabase
+    .from("customers")
+    .select(selectFields)
+    .eq("salon_id", currentSalon.id);
 
   if (
     error &&
@@ -276,7 +281,10 @@ async function getCustomers() {
     error.message.includes("recovery_probability")
   ) {
     selectFields = "id,first_name,last_name,birth_date,ai_status,total_spent";
-    const fallback = await supabase.from("customers").select(selectFields);
+    const fallback = await supabase
+      .from("customers")
+      .select(selectFields)
+      .eq("salon_id", currentSalon.id);
 
     if (fallback.error) {
       console.error("Errore Supabase fatturato customers:", fallback.error);
@@ -300,8 +308,9 @@ async function getCustomers() {
 
 async function getAppointments(period: DateRange) {
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     throw new Error(
       "Configurazione Supabase non valida. Controlla le variabili ambiente.",
     );
@@ -310,6 +319,7 @@ async function getAppointments(period: DateRange) {
   const { data, error } = await supabase
     .from("appointments")
     .select("customer_id,appointment_date,service_price")
+    .eq("salon_id", currentSalon.id)
     .gte("appointment_date", period.start)
     .lte("appointment_date", period.end)
     .order("appointment_date", { ascending: true });
@@ -332,6 +342,7 @@ async function getAppointments(period: DateRange) {
   const fallback = await supabase
     .from("appointments")
     .select("customer_id,appointment_date,amount")
+    .eq("salon_id", currentSalon.id)
     .gte("appointment_date", period.start)
     .lte("appointment_date", period.end)
     .order("appointment_date", { ascending: true });

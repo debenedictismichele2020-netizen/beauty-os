@@ -1,4 +1,5 @@
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { ensureCurrentUserSalon } from "@/lib/auth";
 
 export type OperationalTaskType =
   | "recovery"
@@ -152,7 +153,7 @@ function normalizeTaskRow(row: OperationalTaskRow): OperationalTask | null {
   };
 }
 
-function toTaskRow(task: OperationalTask) {
+function toTaskRow(task: OperationalTask, salonId: string) {
   return {
     completed_at: task.status === "completed" ? task.updatedAt : null,
     customer_id: task.customerId ?? null,
@@ -166,6 +167,7 @@ function toTaskRow(task: OperationalTask) {
     profile_href: task.profileHref ?? null,
     reason: task.reason,
     recovery_probability: task.recoveryProbability,
+    salon_id: salonId,
     snoozed_from_date: task.status === "snoozed" ? task.date : null,
     status: task.status,
     title: task.title ?? null,
@@ -229,9 +231,16 @@ function scheduleOperationalTasksHydration() {
   void (async () => {
     try {
       const localTasks = readOperationalTasksFromLocalStorage();
+      const currentSalon = await ensureCurrentUserSalon();
+
+      if (!currentSalon) {
+        return;
+      }
+
       const { data, error } = await supabase
         .from("operational_tasks")
         .select("*")
+        .eq("salon_id", currentSalon.id)
         .order("date", { ascending: true });
 
       if (error) {
@@ -265,14 +274,17 @@ function scheduleOperationalTasksHydration() {
 
 async function upsertOperationalTasksToSupabase(tasks: OperationalTask[]) {
   const supabase = createSupabaseBrowserClient();
+  const currentSalon = await ensureCurrentUserSalon();
 
-  if (!supabase || tasks.length === 0) {
+  if (!supabase || !currentSalon || tasks.length === 0) {
     return;
   }
 
   const { error } = await supabase
     .from("operational_tasks")
-    .upsert(tasks.map(toTaskRow), { onConflict: "local_task_id" });
+    .upsert(tasks.map((task) => toTaskRow(task, currentSalon.id)), {
+      onConflict: "salon_id,local_task_id",
+    });
 
   if (error) {
     console.warn("Fallback localStorage operational_tasks:", error.message);

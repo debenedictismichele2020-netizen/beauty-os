@@ -18,14 +18,15 @@ import RetentionHistoryDrawer, {
 import {
   analyzeRetention,
   generateRecoveryMessage,
-  getAppointmentsByCustomerId,
-  getCustomerById,
-  getCustomerIds,
   getProfileDataQuality,
   healthLabels,
   statusLabels,
   statusStyles,
 } from "../data";
+import {
+  getAppointmentsByCustomerId,
+  getCustomerById,
+} from "../serverData";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ type CustomerProfilePageProps = {
 };
 
 export async function generateStaticParams() {
-  return getCustomerIds();
+  return [];
 }
 
 export async function generateMetadata({

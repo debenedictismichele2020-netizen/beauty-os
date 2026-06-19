@@ -1,6 +1,7 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentSalon } from "@/lib/currentSalon";
 import {
   defaultAiSettings,
   normalizeAiSettings,
@@ -327,6 +328,7 @@ function formatCustomerForPrompt(customer: {
 
 async function getRecentServicesByCustomerId(
   supabase: NonNullable<ReturnType<typeof createSupabaseServerClient>>,
+  salonId: string,
   customerIds: string[],
 ) {
   if (customerIds.length === 0) {
@@ -336,6 +338,7 @@ async function getRecentServicesByCustomerId(
   const { data, error } = await supabase
     .from("appointments")
     .select("customer_id,service_name,appointment_date")
+    .eq("salon_id", salonId)
     .in("customer_id", customerIds)
     .order("appointment_date", { ascending: false });
 
@@ -554,8 +557,9 @@ export async function getCampaignSelectedCustomers(
   }
 
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return {
       customers: [],
       error: "Configurazione dati non disponibile.",
@@ -566,6 +570,7 @@ export async function getCampaignSelectedCustomers(
   const { data, error } = await supabase
     .from("customers")
     .select(customerSelect)
+    .eq("salon_id", currentSalon.id)
     .order("total_spent", { ascending: false });
 
   if (error) {
@@ -601,8 +606,9 @@ export async function getCustomCampaignSelectedCustomers(
   }
 
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return {
       customers: [],
       error: "Configurazione dati non disponibile.",
@@ -613,6 +619,7 @@ export async function getCustomCampaignSelectedCustomers(
   const { data, error } = await supabase
     .from("customers")
     .select(customerSelect)
+    .eq("salon_id", currentSalon.id)
     .order("total_spent", { ascending: false });
 
   if (error) {
@@ -669,8 +676,9 @@ export async function generateAiCampaign(
   }
 
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return {
       success: false,
       campaignName: "",
@@ -681,7 +689,10 @@ export async function generateAiCampaign(
     };
   }
 
-  const { data, error } = await supabase.from("customers").select(customerSelect);
+  const { data, error } = await supabase
+    .from("customers")
+    .select(customerSelect)
+    .eq("salon_id", currentSalon.id);
 
   if (error) {
     console.error("Errore Supabase generateAiCampaign:", error);
@@ -699,6 +710,7 @@ export async function generateAiCampaign(
   const selectedCustomers = filterCustomersBySegment(data, segmentStatus);
   const recentServicesByCustomerId = await getRecentServicesByCustomerId(
     supabase,
+    currentSalon.id,
     selectedCustomers.map((customer) => customer.id),
   );
   const normalizedServices = normalizeSelectedServices(selectedServices);
@@ -888,8 +900,9 @@ export async function generateCustomAiCampaign(
   }
 
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return {
       success: false,
       campaignName: "",
@@ -900,7 +913,10 @@ export async function generateCustomAiCampaign(
     };
   }
 
-  const { data, error } = await supabase.from("customers").select(customerSelect);
+  const { data, error } = await supabase
+    .from("customers")
+    .select(customerSelect)
+    .eq("salon_id", currentSalon.id);
 
   if (error) {
     console.error("Errore Supabase generateCustomAiCampaign:", error);
@@ -923,6 +939,7 @@ export async function generateCustomAiCampaign(
       : filterCustomersByCustomSegment(data, input.segment);
   const recentServicesByCustomerId = await getRecentServicesByCustomerId(
     supabase,
+    currentSalon.id,
     selectedCustomers.map((customer) => customer.id),
   );
   const normalizedServices = normalizeSelectedServices(input.selectedServices);

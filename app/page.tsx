@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentSalon } from "@/lib/currentSalon";
 import { buildFinalWhatsAppMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
 import {
   buildOverviewActions,
@@ -12,9 +13,9 @@ import OverviewTodayPerformance from "./OverviewTodayPerformance";
 import {
   type Customer,
   formatCompactCurrency,
-  getCustomers,
   statusLabels,
 } from "./clients/data";
+import { getCustomers } from "./clients/serverData";
 
 export const dynamic = "force-dynamic";
 
@@ -142,8 +143,9 @@ function getPriorityReason(
 
 async function getCurrentMonthRevenue() {
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return 0;
   }
 
@@ -155,6 +157,7 @@ async function getCurrentMonthRevenue() {
     supabase
       .from("appointments")
       .select(fields)
+      .eq("salon_id", currentSalon.id)
       .gte("appointment_date", toDateKey(start))
       .lte("appointment_date", toDateKey(end));
 
@@ -209,14 +212,16 @@ async function getCurrentMonthRevenue() {
 
 async function getOverviewAppointmentUsage(): Promise<OverviewVisit[]> {
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return [];
   }
 
   const { data, error } = await supabase
     .from("appointments")
-    .select("service_name,service_price,appointment_date");
+    .select("service_name,service_price,appointment_date")
+    .eq("salon_id", currentSalon.id);
 
   if (!error) {
     return (data ?? []).flatMap((appointment) => {
@@ -236,7 +241,8 @@ async function getOverviewAppointmentUsage(): Promise<OverviewVisit[]> {
 
   const fallback = await supabase
     .from("appointments")
-    .select("service_name,amount,appointment_date");
+    .select("service_name,amount,appointment_date")
+    .eq("salon_id", currentSalon.id);
 
   if (fallback.error) {
     console.error("Errore Supabase visite panoramica:", fallback.error);

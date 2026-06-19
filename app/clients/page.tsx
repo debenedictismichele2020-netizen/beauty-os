@@ -8,12 +8,11 @@ import CustomerSearch from "./CustomerSearch";
 import StatusFilters from "./StatusFilters";
 import {
   type Customer,
-  getCustomerKpis,
-  getCustomers,
   isCustomerProfileIncomplete,
   statusLabels,
   statusStyles,
 } from "./data";
+import { getCustomerKpis, getCustomers } from "./serverData";
 
 export const metadata: Metadata = {
   title: "Clienti | Beauty OS",

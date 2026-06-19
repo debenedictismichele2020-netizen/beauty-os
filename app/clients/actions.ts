@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentSalon } from "@/lib/currentSalon";
 import {
   normalizeCustomerGender,
   type CustomerGender,
@@ -170,10 +171,12 @@ function average(values: number[], fallback: number) {
 
 async function getRetentionBenchmark(
   supabase: NonNullable<ReturnType<typeof createSupabaseServerClient>>,
+  salonId: string,
 ): Promise<RetentionBenchmark> {
   const { data, error } = await supabase
     .from("customers")
-    .select("birth_date,total_spent,average_visit_frequency_days,last_visit_date");
+    .select("birth_date,total_spent,average_visit_frequency_days,last_visit_date")
+    .eq("salon_id", salonId);
 
   if (error) {
     console.error("Errore benchmark retention:", error);
@@ -316,10 +319,12 @@ function isMissingServicePriceError(error: { details?: string | null; message: s
 async function getAppointmentKpiRows(
   supabase: NonNullable<ReturnType<typeof createSupabaseServerClient>>,
   customerId: string,
+  salonId: string,
 ) {
   const { data, error } = await supabase
     .from("appointments")
     .select("appointment_date,service_price")
+    .eq("salon_id", salonId)
     .eq("customer_id", customerId)
     .order("appointment_date", { ascending: true });
 
@@ -340,6 +345,7 @@ async function getAppointmentKpiRows(
   const { data: fallbackData, error: fallbackError } = await supabase
     .from("appointments")
     .select("appointment_date,amount")
+    .eq("salon_id", salonId)
     .eq("customer_id", customerId)
     .order("appointment_date", { ascending: true });
 
@@ -361,6 +367,7 @@ async function insertAppointment(
     appointment_date: string;
     customer_id: string;
     notes: string | null;
+    salon_id: string;
     service_name: string;
     service_price: number;
   },
@@ -376,6 +383,7 @@ async function insertAppointment(
     amount: appointment.service_price,
     customer_id: appointment.customer_id,
     notes: appointment.notes,
+    salon_id: appointment.salon_id,
     service_name: appointment.service_name,
   });
 
@@ -389,6 +397,7 @@ async function updateAppointmentRow(
     appointmentId: string;
     customerId: string;
     notes: string | null;
+    salonId: string;
     serviceName: string;
     servicePrice: number;
   },
@@ -402,6 +411,7 @@ async function updateAppointmentRow(
       notes: appointment.notes,
     })
     .eq("id", appointment.appointmentId)
+    .eq("salon_id", appointment.salonId)
     .eq("customer_id", appointment.customerId);
 
   if (!error || !isMissingServicePriceError(error)) {
@@ -417,6 +427,7 @@ async function updateAppointmentRow(
       notes: appointment.notes,
     })
     .eq("id", appointment.appointmentId)
+    .eq("salon_id", appointment.salonId)
     .eq("customer_id", appointment.customerId);
 
   return fallbackError;
@@ -473,6 +484,7 @@ function logCustomerKpiRecalculation({
 async function updateCustomerKpisFromAppointments(
   supabase: NonNullable<ReturnType<typeof createSupabaseServerClient>>,
   customerId: string,
+  salonId: string,
   kpis: CustomerKpiUpdate,
 ) {
   console.log("RECALC UPDATE PAYLOAD", { customerId, kpis });
@@ -480,6 +492,7 @@ async function updateCustomerKpisFromAppointments(
   const { data, error } = await supabase
     .from("customers")
     .update(kpis)
+    .eq("salon_id", salonId)
     .eq("id", customerId)
     .select("id,birth_date,total_spent,average_visit_frequency_days,retention_score,ai_status,last_visit_date")
     .single();
@@ -502,6 +515,7 @@ async function updateCustomerKpisFromAppointments(
       const { data: fallbackData, error: fallbackError } = await supabase
         .from("customers")
         .update(compatibleKpis)
+        .eq("salon_id", salonId)
         .eq("id", customerId)
         .select("id,birth_date,total_spent,average_visit_frequency_days,retention_score,ai_status,last_visit_date")
         .single();
@@ -553,8 +567,9 @@ export async function recalculateCustomerMetrics(
   console.log("RECALC START", customerId);
 
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return {
       success: false,
       message: "Configurazione Supabase non valida. Controlla le variabili ambiente.",
@@ -564,6 +579,7 @@ export async function recalculateCustomerMetrics(
   const { data: visits, error: visitsError } = await getAppointmentKpiRows(
     supabase,
     customerId,
+    currentSalon.id,
   );
 
   console.log("RECALC APPOINTMENTS FOUND", visits);
@@ -589,6 +605,7 @@ export async function recalculateCustomerMetrics(
     const recalculation = await updateCustomerKpisFromAppointments(
       supabase,
       customerId,
+      currentSalon.id,
       emptyMetrics,
     );
 
@@ -626,7 +643,7 @@ export async function recalculateCustomerMetrics(
     new Date(`${lastVisitDate}T00:00:00`),
     new Date(),
   );
-  const benchmark = await getRetentionBenchmark(supabase);
+  const benchmark = await getRetentionBenchmark(supabase, currentSalon.id);
   const retentionScore = calculateRetentionScore({
     averageVisitFrequencyDays,
     benchmark,
@@ -655,6 +672,7 @@ export async function recalculateCustomerMetrics(
   const recalculation = await updateCustomerKpisFromAppointments(
     supabase,
     customerId,
+    currentSalon.id,
     metrics,
   );
 
@@ -772,8 +790,9 @@ export async function generateAiRecoveryMessage(
   }
 
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return {
       success: false,
       message: "Configurazione Supabase non valida. Controlla le variabili ambiente.",
@@ -785,6 +804,7 @@ export async function generateAiRecoveryMessage(
     .select(
       "first_name,birth_date,gender,ai_status,last_visit_date,total_spent,retention_score,average_visit_frequency_days",
     )
+    .eq("salon_id", currentSalon.id)
     .eq("id", customerId)
     .maybeSingle();
 
@@ -937,8 +957,9 @@ export async function addAppointment(
   }
 
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return {
       success: false,
       message: "Configurazione Supabase non valida. Controlla le variabili ambiente.",
@@ -947,6 +968,7 @@ export async function addAppointment(
 
   const error = await insertAppointment(supabase, {
     customer_id: customerId,
+    salon_id: currentSalon.id,
     service_name: serviceName,
     appointment_date: appointmentDate,
     service_price: servicePrice,
@@ -1019,8 +1041,9 @@ export async function updateAppointment(
   }
 
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return {
       success: false,
       message: "Configurazione Supabase non valida. Controlla le variabili ambiente.",
@@ -1032,6 +1055,7 @@ export async function updateAppointment(
     appointmentId,
     customerId,
     notes: notes || null,
+    salonId: currentSalon.id,
     serviceName,
     servicePrice,
   });
@@ -1077,8 +1101,9 @@ export async function deleteAppointment(
   }
 
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return {
       success: false,
       message: "Configurazione Supabase non valida. Controlla le variabili ambiente.",
@@ -1089,6 +1114,7 @@ export async function deleteAppointment(
     .from("appointments")
     .delete()
     .eq("id", appointmentId)
+    .eq("salon_id", currentSalon.id)
     .eq("customer_id", customerId);
 
   if (error) {
@@ -1144,8 +1170,9 @@ export async function addCustomer(
   }
 
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return {
       success: false,
       message: "Configurazione Supabase non valida. Controlla le variabili ambiente.",
@@ -1165,6 +1192,7 @@ export async function addCustomer(
     average_visit_frequency_days: 30,
     last_visit_date: null,
     notes: notes || null,
+    salon_id: currentSalon.id,
   };
   let { error } = await supabase.from("customers").insert(customerPayload);
 
@@ -1232,8 +1260,9 @@ export async function updateCustomer(
   }
 
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return {
       success: false,
       message: "Configurazione Supabase non valida. Controlla le variabili ambiente.",
@@ -1252,6 +1281,7 @@ export async function updateCustomer(
   let { data: updatedCustomer, error } = await supabase
     .from("customers")
     .update(customerPayload)
+    .eq("salon_id", currentSalon.id)
     .eq("id", customerId)
     .select("id,birth_date")
     .single();
@@ -1263,6 +1293,7 @@ export async function updateCustomer(
         ...customerPayload,
         gender: toLegacyCustomerGenderValue(gender),
       })
+      .eq("salon_id", currentSalon.id)
       .eq("id", customerId)
       .select("id,birth_date")
       .single();
@@ -1318,15 +1349,20 @@ export async function deleteCustomer(
   }
 
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return {
       success: false,
       message: "Configurazione Supabase non valida. Controlla le variabili ambiente.",
     };
   }
 
-  const { error } = await supabase.from("customers").delete().eq("id", customerId);
+  const { error } = await supabase
+    .from("customers")
+    .delete()
+    .eq("salon_id", currentSalon.id)
+    .eq("id", customerId);
 
   if (error) {
     console.error("Errore Supabase deleteCustomer:", error);

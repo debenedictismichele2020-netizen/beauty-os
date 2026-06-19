@@ -9,11 +9,16 @@ import { isSupabaseAuthConfigured, signInWithEmail } from "@/lib/auth";
 export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") || "/";
+  const requestedNextPath = searchParams.get("next");
+  const nextPath =
+    requestedNextPath?.startsWith("/") && !requestedNextPath.startsWith("//")
+      ? requestedNextPath
+      : "/";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const confirmationError = searchParams.get("error") === "confirmation";
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -55,6 +60,13 @@ export default function LoginForm() {
           {!isSupabaseAuthConfigured() ? (
             <p className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
               Supabase Auth non è configurato. Controlla le variabili ambiente prima di usare il login.
+            </p>
+          ) : null}
+
+          {confirmationError && !message ? (
+            <p className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">
+              Il link di conferma non è valido o è scaduto. Accedi oppure
+              richiedi una nuova registrazione.
             </p>
           ) : null}
 

@@ -1,4 +1,5 @@
 import { cleanupLegacyLocalStorageKeys } from "@/lib/legacyLocalStorage";
+import { ensureCurrentUserSalon } from "@/lib/auth";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 export const serviceCatalogStorageKey = "beauty_os_service_catalog";
@@ -37,6 +38,7 @@ type ServiceRow = {
   id?: string | null;
   local_service_id?: string | null;
   name?: string | null;
+  salon_id?: string | null;
 };
 
 export const defaultServiceCatalog: ServiceCatalogItem[] = [
@@ -145,7 +147,7 @@ function normalizeServiceRow(row: ServiceRow): ServiceCatalogItem | null {
   };
 }
 
-function toServiceRow(service: ServiceCatalogItem) {
+function toServiceRow(service: ServiceCatalogItem, salonId: string) {
   return {
     active: service.active,
     average_duration_minutes: service.averageDurationMinutes ?? 0,
@@ -154,6 +156,7 @@ function toServiceRow(service: ServiceCatalogItem) {
     deleted_at: null,
     local_service_id: service.id,
     name: service.name,
+    salon_id: salonId,
     updated_at: new Date().toISOString(),
   };
 }
@@ -327,9 +330,16 @@ function scheduleServiceCatalogHydration() {
       cleanupLegacyLocalStorageKeys();
 
       const localServices = readServiceCatalogFromLocalStorage();
+      const currentSalon = await ensureCurrentUserSalon();
+
+      if (!currentSalon) {
+        return;
+      }
+
       const { data, error } = await supabase
         .from("services")
         .select("*")
+        .eq("salon_id", currentSalon.id)
         .is("deleted_at", null)
         .order("name", { ascending: true });
 
@@ -364,16 +374,17 @@ function scheduleServiceCatalogHydration() {
 
 async function upsertServicesToSupabase(services: ServiceCatalogItem[]) {
   const supabase = createSupabaseBrowserClient();
+  const currentSalon = await ensureCurrentUserSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return;
   }
 
   const normalizedServices = normalizeServiceCatalog(services);
   const { error } = await supabase
     .from("services")
-    .upsert(normalizedServices.map(toServiceRow), {
-      onConflict: "local_service_id",
+    .upsert(normalizedServices.map((service) => toServiceRow(service, currentSalon.id)), {
+      onConflict: "salon_id,local_service_id",
     });
 
   if (error) {
@@ -383,8 +394,9 @@ async function upsertServicesToSupabase(services: ServiceCatalogItem[]) {
 
 async function syncSavedCatalogToSupabase(services: ServiceCatalogItem[]) {
   const supabase = createSupabaseBrowserClient();
+  const currentSalon = await ensureCurrentUserSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return;
   }
 
@@ -396,6 +408,7 @@ async function syncSavedCatalogToSupabase(services: ServiceCatalogItem[]) {
   const { data, error } = await supabase
     .from("services")
     .select("local_service_id")
+    .eq("salon_id", currentSalon.id)
     .is("deleted_at", null);
 
   if (error) {
@@ -414,6 +427,7 @@ async function syncSavedCatalogToSupabase(services: ServiceCatalogItem[]) {
   const { error: deleteError } = await supabase
     .from("services")
     .update({ deleted_at: new Date().toISOString(), active: false })
+    .eq("salon_id", currentSalon.id)
     .in("local_service_id", removedServiceIds);
 
   if (deleteError) {

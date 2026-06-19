@@ -8,8 +8,10 @@ const protectedRoutes = [
   "/catalogo",
   "/clients",
   "/fatturato",
+  "/fidelizzazione",
   "/impostazioni",
   "/impostazioni-ai",
+  "/motore-ai",
   "/opportunita-ai",
 ];
 
@@ -39,6 +41,14 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (!isSupabaseConfigured()) {
+    if (isProtectedPath(pathname)) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.searchParams.set("next", pathname);
+
+      return NextResponse.redirect(loginUrl);
+    }
+
     return NextResponse.next();
   }
 
@@ -95,7 +105,13 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(homeUrl);
     }
   } catch {
-    return NextResponse.next();
+    if (isProtectedPath(pathname)) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.searchParams.set("next", pathname);
+
+      return NextResponse.redirect(loginUrl);
+    }
   }
 
   return response;
@@ -109,8 +125,10 @@ export const config = {
     "/catalogo/:path*",
     "/clients/:path*",
     "/fatturato/:path*",
+    "/fidelizzazione/:path*",
     "/impostazioni/:path*",
     "/impostazioni-ai/:path*",
+    "/motore-ai/:path*",
     "/opportunita-ai/:path*",
     "/login",
     "/register",

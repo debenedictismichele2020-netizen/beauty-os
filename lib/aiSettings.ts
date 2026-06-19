@@ -1,4 +1,5 @@
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { ensureCurrentUserSalon } from "@/lib/auth";
 
 export const aiToneStorageKey = "beauty_os_ai_tone";
 export const aiMessageLengthStorageKey = "beauty_os_ai_message_length";
@@ -98,6 +99,7 @@ type SalonAiSettingsRow = {
   id?: string | null;
   message_length?: string | null;
   preferences?: unknown;
+  salon_id?: string | null;
   tone?: string | null;
 };
 
@@ -230,13 +232,14 @@ function normalizeAiSettingsRow(row: SalonAiSettingsRow): AiGenerationSettings {
   });
 }
 
-function toAiSettingsRow(settings: AiGenerationSettings) {
+function toAiSettingsRow(settings: AiGenerationSettings, salonId: string) {
   return {
     business_signature: settings.businessSignature,
     creativity: settings.creativity,
     emoji_style: settings.emojiStyle,
     message_length: settings.messageLength,
     preferences: settings.preferences,
+    salon_id: salonId,
     tone: settings.tone,
     updated_at: new Date().toISOString(),
   };
@@ -263,9 +266,16 @@ function scheduleAiSettingsHydration() {
   void (async () => {
     try {
       const localSettings = readAiSettingsFromLocalStorage();
+      const currentSalon = await ensureCurrentUserSalon();
+
+      if (!currentSalon) {
+        return;
+      }
+
       const { data, error } = await supabase
         .from("salon_ai_settings")
         .select("*")
+        .eq("salon_id", currentSalon.id)
         .order("created_at", { ascending: true })
         .limit(1);
 
@@ -296,8 +306,9 @@ function scheduleAiSettingsHydration() {
 
 async function upsertAiSettingsToSupabase(settings: AiGenerationSettings) {
   const supabase = createSupabaseBrowserClient();
+  const currentSalon = await ensureCurrentUserSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return;
   }
 
@@ -305,6 +316,7 @@ async function upsertAiSettingsToSupabase(settings: AiGenerationSettings) {
   const { data, error } = await supabase
     .from("salon_ai_settings")
     .select("id")
+    .eq("salon_id", currentSalon.id)
     .order("created_at", { ascending: true })
     .limit(1);
 
@@ -318,7 +330,8 @@ async function upsertAiSettingsToSupabase(settings: AiGenerationSettings) {
   if (existingId) {
     const { error: updateError } = await supabase
       .from("salon_ai_settings")
-      .update(toAiSettingsRow(normalizedSettings))
+      .update(toAiSettingsRow(normalizedSettings, currentSalon.id))
+      .eq("salon_id", currentSalon.id)
       .eq("id", existingId);
 
     if (updateError) {
@@ -330,7 +343,7 @@ async function upsertAiSettingsToSupabase(settings: AiGenerationSettings) {
 
   const { error: insertError } = await supabase
     .from("salon_ai_settings")
-    .insert(toAiSettingsRow(normalizedSettings));
+    .insert(toAiSettingsRow(normalizedSettings, currentSalon.id));
 
   if (insertError) {
     console.warn("Fallback localStorage salon_ai_settings:", insertError.message);

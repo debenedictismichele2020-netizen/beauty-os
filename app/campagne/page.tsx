@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentSalon } from "@/lib/currentSalon";
 import { PageHeader, PageShell } from "../components/BeautyUi";
 import {
   ageCampaignSegments,
@@ -76,6 +77,7 @@ function formatCurrency(value: number) {
 
 async function getCampaignSegmentSummaries() {
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
   const emptySummaries = Object.fromEntries(
     campaignSegments.map((segment) => [
       segment.status,
@@ -95,7 +97,7 @@ async function getCampaignSegmentSummaries() {
     ]),
   ) as Record<BirthdayCampaignSegmentStatus, SegmentSummary>;
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return {
       ageSummaries: emptyAgeSummaries,
       birthdaySummaries: emptyBirthdaySummaries,
@@ -106,7 +108,8 @@ async function getCampaignSegmentSummaries() {
 
   const { data, error } = await supabase
     .from("customers")
-    .select("birth_date,ai_status,total_spent");
+    .select("birth_date,ai_status,total_spent")
+    .eq("salon_id", currentSalon.id);
 
   if (error) {
     console.error("Errore Supabase getCampaignSegmentSummaries:", error);

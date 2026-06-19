@@ -4,7 +4,7 @@ import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { ensureUserSalon, getCurrentUser, signOut } from "@/lib/auth";
+import { ensureCurrentUserSalon, getCurrentUser, signOut } from "@/lib/auth";
 
 type SidebarAccountState = {
   email: string;
@@ -24,8 +24,7 @@ export default function SidebarAccountPanel({
   compact = false,
 }: SidebarAccountPanelProps) {
   const router = useRouter();
-  const [account, setAccount] =
-    useState<SidebarAccountState>(fallbackAccount);
+  const [account, setAccount] = useState<SidebarAccountState | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -33,15 +32,26 @@ export default function SidebarAccountPanel({
     async function loadAccount() {
       try {
         const user = await getCurrentUser();
-        const salon = user ? await ensureUserSalon() : null;
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (!user) {
+          router.replace("/login");
+          router.refresh();
+          return;
+        }
+
+        const salon = await ensureCurrentUserSalon();
 
         if (!isMounted) {
           return;
         }
 
         setAccount({
-          email: user?.email ?? fallbackAccount.email,
-          salonName: salon?.name ?? fallbackAccount.salonName,
+          email: user.email ?? fallbackAccount.email,
+          salonName: salon?.name ?? "Nuovo salone",
         });
       } catch {
         if (isMounted) {
@@ -55,7 +65,7 @@ export default function SidebarAccountPanel({
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [router]);
 
   async function handleSignOut() {
     await signOut();
@@ -64,7 +74,7 @@ export default function SidebarAccountPanel({
   }
 
   const initials =
-    account.email === fallbackAccount.email
+    !account || account.email === fallbackAccount.email
       ? "DE"
       : account.email.slice(0, 2).toUpperCase();
 
@@ -80,10 +90,10 @@ export default function SidebarAccountPanel({
       {!compact ? (
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-black">
-            {account.email}
+            {account?.email ?? "Verifica account..."}
           </p>
           <p className="truncate text-xs text-zinc-500">
-            {account.salonName}
+            {account?.salonName ?? "Beauty OS"}
           </p>
         </div>
       ) : null}

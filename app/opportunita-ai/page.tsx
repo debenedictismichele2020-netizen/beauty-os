@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentSalon } from "@/lib/currentSalon";
 import { PageHeader, PageShell } from "../components/BeautyUi";
 import { formatCompactCurrency } from "../clients/data";
 import OpportunityTable from "./OpportunityTable";
@@ -101,8 +102,9 @@ function getStatusBadgeStyles(status: string | null) {
 
 async function getOpportunityData() {
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return {
       allCustomers: [] as OpportunityCustomer[],
       customers: [] as OpportunityCustomer[],
@@ -114,7 +116,8 @@ async function getOpportunityData() {
     .from("customers")
     .select(
       "id,first_name,last_name,phone,birth_date,ai_status,total_spent,recovery_probability,last_visit_date,average_visit_frequency_days,retention_score",
-    );
+    )
+    .eq("salon_id", currentSalon.id);
 
   if (error) {
     console.error("Errore Supabase opportunità AI:", error);

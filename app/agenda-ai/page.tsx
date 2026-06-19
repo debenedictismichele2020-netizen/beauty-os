@@ -5,8 +5,8 @@ import { PageHeader, PageShell } from "../components/BeautyUi";
 import {
   type Customer,
   formatCompactCurrency,
-  getCustomers,
 } from "../clients/data";
+import { getCustomers } from "../clients/serverData";
 import { AgendaCalendar, type AgendaTask } from "./AgendaCalendar";
 
 export const metadata: Metadata = {

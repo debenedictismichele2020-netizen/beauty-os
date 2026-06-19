@@ -55,7 +55,8 @@ export default function RegisterForm() {
               Crea account
             </h1>
             <p className="mt-3 text-sm leading-6 text-zinc-500">
-              Crea il primo accesso del salone. Il collegamento multi-salone sarà attivato quando le tabelle saranno applicate.
+              Crea il tuo accesso a Beauty OS. Potrai completare i dettagli
+              dello studio anche in seguito.
             </p>
           </div>
 
@@ -67,12 +68,12 @@ export default function RegisterForm() {
 
           <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
             <label className="block text-sm font-medium text-zinc-700">
-              Nome salone
+              Nome salone{" "}
+              <span className="font-normal text-zinc-400">(opzionale)</span>
               <input
                 autoComplete="organization"
                 className="mt-2 w-full rounded-2xl border border-black/10 bg-[#f7f7f5] px-4 py-3 text-sm text-zinc-950 outline-none transition focus:border-black/30"
                 onChange={(event) => setSalonName(event.target.value)}
-                required
                 type="text"
                 value={salonName}
               />

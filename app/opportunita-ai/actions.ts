@@ -1,6 +1,7 @@
 "use server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentSalon } from "@/lib/currentSalon";
 import { normalizeCustomerGender } from "@/lib/gender";
 import { cleanWhatsAppMessage } from "@/lib/whatsapp";
 
@@ -102,8 +103,9 @@ export async function generateOpportunityMessage(
   }
 
   const supabase = createSupabaseServerClient();
+  const currentSalon = await getCurrentSalon();
 
-  if (!supabase) {
+  if (!supabase || !currentSalon) {
     return {
       success: false,
       message: "",
@@ -116,6 +118,7 @@ export async function generateOpportunityMessage(
     .select(
       "first_name,last_name,phone,birth_date,gender,ai_status,last_visit_date,total_spent,retention_score,recovery_probability,average_visit_frequency_days",
     )
+    .eq("salon_id", currentSalon.id)
     .eq("id", customerId)
     .single();
 
