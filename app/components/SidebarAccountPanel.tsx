@@ -20,6 +20,14 @@ const fallbackAccount: SidebarAccountState = {
   salonName: "Studio Beauty",
 };
 
+function getMetadataSalonName(user: Awaited<ReturnType<typeof getCurrentUser>>) {
+  const metadataSalonName = user?.user_metadata?.salon_name;
+
+  return typeof metadataSalonName === "string" && metadataSalonName.trim()
+    ? metadataSalonName.trim()
+    : "Nuovo salone";
+}
+
 export default function SidebarAccountPanel({
   compact = false,
 }: SidebarAccountPanelProps) {
@@ -51,7 +59,7 @@ export default function SidebarAccountPanel({
 
         setAccount({
           email: user.email ?? fallbackAccount.email,
-          salonName: salon?.name ?? "Nuovo salone",
+          salonName: salon?.name ?? getMetadataSalonName(user),
         });
       } catch {
         if (isMounted) {

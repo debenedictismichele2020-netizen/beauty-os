@@ -9,8 +9,10 @@ export type ProvisionedSalon = {
 
 type SalonRow = {
   created_at?: string | null;
+  deleted_at?: string | null;
   id: string;
   name: string;
+  owner_user_id?: string | null;
   slug: string | null;
 };
 
@@ -100,6 +102,65 @@ function chooseCanonicalMembership(rows: MembershipRow[]) {
   })[0];
 }
 
+async function getOwnedSalon(
+  supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  userId: string,
+) {
+  const { data, error } = await supabase
+    .from("salons")
+    .select("id,name,slug,owner_user_id,deleted_at,created_at")
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: true })
+    .returns<SalonRow[]>();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.[0] ?? null;
+}
+
+async function ensureOwnerMembership(
+  supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  userId: string,
+  salonId: string,
+  existingMembership?: MembershipRow | null,
+) {
+  if (existingMembership?.id) {
+    const { error } = await supabase
+      .from("salon_members")
+      .update({
+        role: "owner",
+        salon_id: salonId,
+      })
+      .eq("id", existingMembership.id);
+
+    if (!error) {
+      return;
+    }
+
+    if (error.code !== "23505") {
+      throw new Error(error.message);
+    }
+  }
+
+  const { error } = await supabase
+    .from("salon_members")
+    .upsert(
+      {
+        role: "owner",
+        salon_id: salonId,
+        user_id: userId,
+      },
+      { onConflict: "salon_id,user_id" },
+    );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 async function getExistingMembership(
   supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
   userId: string,
@@ -132,47 +193,32 @@ export async function ensureSalonForUser(
   if (existingMembership?.salon_id) {
     const { data: existingSalon, error: salonReadError } = await supabase
       .from("salons")
-      .select("id,name,slug,created_at")
+      .select("id,name,slug,owner_user_id,deleted_at,created_at")
       .eq("id", existingMembership.salon_id)
+      .is("deleted_at", null)
       .maybeSingle<SalonRow>();
 
     if (salonReadError) {
       throw new Error(salonReadError.message);
     }
 
-    return mapSalon(existingSalon, existingMembership);
+    const mappedSalon = mapSalon(existingSalon, existingMembership);
+
+    if (mappedSalon) {
+      return mappedSalon;
+    }
   }
 
   const salonName = resolveSalonName(user);
-  const { data: ownedSalons, error: ownedSalonsError } = await supabase
-    .from("salons")
-    .select("id,name,slug,created_at")
-    .eq("owner_user_id", user.id)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: true })
-    .returns<SalonRow[]>();
-
-  if (ownedSalonsError) {
-    throw new Error(ownedSalonsError.message);
-  }
-
-  const existingOwnedSalon = ownedSalons?.[0];
+  const existingOwnedSalon = await getOwnedSalon(supabase, user.id);
 
   if (existingOwnedSalon?.id) {
-    const { error: membershipUpsertError } = await supabase
-      .from("salon_members")
-      .upsert(
-        {
-          role: "owner",
-          salon_id: existingOwnedSalon.id,
-          user_id: user.id,
-        },
-        { onConflict: "salon_id,user_id" },
-      );
-
-    if (membershipUpsertError) {
-      throw new Error(membershipUpsertError.message);
-    }
+    await ensureOwnerMembership(
+      supabase,
+      user.id,
+      existingOwnedSalon.id,
+      existingMembership,
+    );
 
     return mapSalon(existingOwnedSalon, { role: "owner" });
   }
@@ -204,7 +250,7 @@ export async function ensureSalonForUser(
     const { data: concurrentOwnedSalons, error: concurrentReadError } =
       await supabase
         .from("salons")
-        .select("id,name,slug,created_at")
+        .select("id,name,slug,owner_user_id,deleted_at,created_at")
         .eq("owner_user_id", user.id)
         .is("deleted_at", null)
         .order("created_at", { ascending: true })
@@ -224,21 +270,7 @@ export async function ensureSalonForUser(
     throw new Error("Impossibile creare uno slug salone univoco.");
   }
 
-  const { error: membershipInsertError } = await supabase
-    .from("salon_members")
-    .insert({
-      role: "owner",
-      salon_id: salon.id,
-      user_id: user.id,
-    });
-
-  if (membershipInsertError) {
-    if (membershipInsertError.code === "23505") {
-      return ensureSalonForUser(user);
-    }
-
-    throw new Error(membershipInsertError.message);
-  }
+  await ensureOwnerMembership(supabase, user.id, salon.id);
 
   return mapSalon(salon, { role: "owner" });
 }
