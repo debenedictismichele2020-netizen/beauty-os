@@ -263,9 +263,7 @@ async function getCustomers() {
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
-    throw new Error(
-      "Configurazione Supabase non valida. Controlla le variabili ambiente.",
-    );
+    return [];
   }
 
   let selectFields =
@@ -288,9 +286,7 @@ async function getCustomers() {
 
     if (fallback.error) {
       console.error("Errore Supabase fatturato customers:", fallback.error);
-      throw new Error(
-        `Impossibile leggere i clienti da Supabase: ${fallback.error.message}`,
-      );
+      return [];
     }
 
     return fallback.data as unknown as CustomerRevenueRow[];
@@ -298,9 +294,7 @@ async function getCustomers() {
 
   if (error) {
     console.error("Errore Supabase fatturato customers:", error);
-    throw new Error(
-      `Impossibile leggere i clienti da Supabase: ${error.message}`,
-    );
+    return [];
   }
 
   return data as unknown as CustomerRevenueRow[];
@@ -311,9 +305,7 @@ async function getAppointments(period: DateRange) {
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
-    throw new Error(
-      "Configurazione Supabase non valida. Controlla le variabili ambiente.",
-    );
+    return [];
   }
 
   const { data, error } = await supabase
@@ -334,9 +326,7 @@ async function getAppointments(period: DateRange) {
 
   if (!missingServicePrice) {
     console.error("Errore Supabase fatturato appointments:", error);
-    throw new Error(
-      `Impossibile leggere le visite da Supabase: ${error.message}`,
-    );
+    return [];
   }
 
   const fallback = await supabase
@@ -349,9 +339,7 @@ async function getAppointments(period: DateRange) {
 
   if (fallback.error) {
     console.error("Errore Supabase fatturato appointments:", fallback.error);
-    throw new Error(
-      `Impossibile leggere le visite da Supabase: ${fallback.error.message}`,
-    );
+    return [];
   }
 
   return fallback.data as unknown as AppointmentRevenueRow[];

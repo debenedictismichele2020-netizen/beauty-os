@@ -108,7 +108,7 @@ async function getOpportunityData() {
     return {
       allCustomers: [] as OpportunityCustomer[],
       customers: [] as OpportunityCustomer[],
-      error: "Configurazione Supabase non valida. Controlla le variabili ambiente.",
+      error: "",
     };
   }
 

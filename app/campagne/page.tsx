@@ -113,9 +113,12 @@ async function getCampaignSegmentSummaries() {
 
   if (error) {
     console.error("Errore Supabase getCampaignSegmentSummaries:", error);
-    throw new Error(
-      `Impossibile leggere i segmenti campagna da Supabase: ${error.message}`,
-    );
+    return {
+      ageSummaries: emptyAgeSummaries,
+      birthdaySummaries: emptyBirthdaySummaries,
+      missingBirthDateCount: 0,
+      segmentSummaries: emptySummaries,
+    };
   }
 
   const rows = (data ?? []) as CampaignCustomerSummaryRow[];

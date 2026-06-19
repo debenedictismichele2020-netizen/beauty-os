@@ -10,6 +10,22 @@ import {
   mapCustomer,
 } from "./data";
 
+const emptyCustomerKpis: CustomerKpis = {
+  totalCustomers: 0,
+  vipCount: 0,
+  vipValue: 0,
+  atRiskCount: 0,
+  lostCount: 0,
+};
+
+const emptyEconomicDashboardKpis: EconomicDashboardKpis = {
+  recoverableRevenue: 0,
+  lostRevenue: 0,
+  atRiskRevenue: 0,
+  averageRecoveryProbability: 0,
+  recoverableCustomerCount: 0,
+};
+
 export async function getCustomers(searchQuery = "", statusFilter = "") {
   const supabase = createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
@@ -46,7 +62,7 @@ export async function getCustomers(searchQuery = "", statusFilter = "") {
 
   if (error) {
     console.error("Errore Supabase getCustomers:", error);
-    throw new Error(`Impossibile leggere i clienti da Supabase: ${error.message}`);
+    return [];
   }
 
   return (data as CustomerRow[]).map(mapCustomer);
@@ -66,9 +82,7 @@ export async function getCustomerKpis(): Promise<CustomerKpis> {
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
-    throw new Error(
-      "Configurazione Supabase non valida. Controlla le variabili ambiente.",
-    );
+    return emptyCustomerKpis;
   }
 
   const pageSize = 1000;
@@ -88,9 +102,7 @@ export async function getCustomerKpis(): Promise<CustomerKpis> {
 
     if (error) {
       console.error("Errore Supabase getCustomerKpis:", error);
-      throw new Error(
-        `Impossibile leggere i KPI clienti da Supabase: ${error.message}`,
-      );
+      return emptyCustomerKpis;
     }
 
     const typedData = data as unknown as Array<{
@@ -127,11 +139,7 @@ export async function getCustomerKpis(): Promise<CustomerKpis> {
       };
     },
     {
-      totalCustomers: 0,
-      vipCount: 0,
-      vipValue: 0,
-      atRiskCount: 0,
-      lostCount: 0,
+      ...emptyCustomerKpis,
     },
   );
 }
@@ -176,11 +184,7 @@ function calculateEconomicDashboardKpis(
       };
     },
     {
-      recoverableRevenue: 0,
-      lostRevenue: 0,
-      atRiskRevenue: 0,
-      averageRecoveryProbability: 0,
-      recoverableCustomerCount: 0,
+      ...emptyEconomicDashboardKpis,
     },
   );
 }
@@ -190,9 +194,7 @@ export async function getEconomicDashboardKpis(): Promise<EconomicDashboardKpis>
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
-    throw new Error(
-      "Configurazione Supabase non valida. Controlla le variabili ambiente.",
-    );
+    return emptyEconomicDashboardKpis;
   }
 
   const pageSize = 1000;
@@ -226,9 +228,7 @@ export async function getEconomicDashboardKpis(): Promise<EconomicDashboardKpis>
 
     if (error) {
       console.error("Errore Supabase getEconomicDashboardKpis:", error);
-      throw new Error(
-        `Impossibile leggere la dashboard economica da Supabase: ${error.message}`,
-      );
+      return emptyEconomicDashboardKpis;
     }
 
     const typedData = data as unknown as Array<{
@@ -278,7 +278,7 @@ export async function getCustomerById(id: string) {
 
   if (error) {
     console.error("Errore Supabase getCustomerById:", error);
-    throw new Error(`Impossibile leggere il cliente da Supabase: ${error.message}`);
+    return null;
   }
 
   return data ? mapCustomer(data as CustomerRow) : null;
@@ -348,9 +348,7 @@ export async function getCustomerIds() {
 
   if (error) {
     console.error("Errore Supabase getCustomerIds:", error);
-    throw new Error(
-      `Impossibile leggere i profili cliente da Supabase: ${error.message}`,
-    );
+    return [];
   }
 
   return data.map((row) => ({ id: row.id }));
