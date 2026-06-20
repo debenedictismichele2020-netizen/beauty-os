@@ -14,15 +14,29 @@ async function resolveSalonWithAuthenticatedClient(
   supabase: ReturnType<typeof createServerClient>,
   userId: string,
 ): Promise<CurrentSalon | null> {
-  const { data: memberships, error: membershipError } = await supabase
+  const { data: ownedSalon, error: ownedSalonError } = await supabase
+    .from("salons")
+    .select("id,name,slug")
+    .eq("owner_user_id", userId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (!ownedSalonError && ownedSalon?.id) {
+    return {
+      id: String(ownedSalon.id),
+      name: String(ownedSalon.name || "Nuovo salone"),
+      role: "owner",
+      slug: typeof ownedSalon.slug === "string" ? ownedSalon.slug : null,
+    };
+  }
+
+  const { data: memberships } = await supabase
     .from("salon_members")
     .select("role,salon_id,created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
-
-  if (membershipError) {
-    console.log("RESOLVE_SALON_MEMBERSHIP_ERROR", membershipError.message);
-  }
 
   const membership = (memberships ?? [])[0] as
     | { role: string | null; salon_id: string | null }
@@ -36,11 +50,7 @@ async function resolveSalonWithAuthenticatedClient(
       .is("deleted_at", null)
       .maybeSingle();
 
-    if (salonError) {
-      console.log("RESOLVE_SALON_READ_ERROR", salonError.message);
-    }
-
-    if (salon?.id) {
+    if (!salonError && salon?.id) {
       return {
         id: String(salon.id),
         name: String(salon.name || "Nuovo salone"),
@@ -50,29 +60,7 @@ async function resolveSalonWithAuthenticatedClient(
     }
   }
 
-  const { data: ownedSalon, error: ownedSalonError } = await supabase
-    .from("salons")
-    .select("id,name,slug")
-    .eq("owner_user_id", userId)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (ownedSalonError) {
-    console.log("RESOLVE_OWNED_SALON_ERROR", ownedSalonError.message);
-  }
-
-  if (!ownedSalon?.id) {
-    return null;
-  }
-
-  return {
-    id: String(ownedSalon.id),
-    name: String(ownedSalon.name || "Nuovo salone"),
-    role: "owner",
-    slug: typeof ownedSalon.slug === "string" ? ownedSalon.slug : null,
-  };
+  return null;
 }
 
 export async function getCurrentSalon(): Promise<CurrentSalon | null> {
@@ -109,21 +97,12 @@ export async function getCurrentSalon(): Promise<CurrentSalon | null> {
   } = await supabase.auth.getUser();
 
   if (error || !user) {
-    console.log("USER_ID", null);
-    console.log("SALON_ID", null);
-    console.log("AUTH_USER_ID", user?.id);
-    console.log("CURRENT_SALON_ID", null);
     return null;
   }
 
   const salon =
     (await resolveExistingSalonForUser(user)) ??
     (await resolveSalonWithAuthenticatedClient(supabase, user.id));
-
-  console.log("USER_ID", user.id);
-  console.log("SALON_ID", salon?.id ?? null);
-  console.log("AUTH_USER_ID", user?.id);
-  console.log("CURRENT_SALON_ID", salon?.id);
 
   return salon;
 }
