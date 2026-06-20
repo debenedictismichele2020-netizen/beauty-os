@@ -1,5 +1,6 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type CurrentSalon = {
   id: string;
@@ -8,14 +9,26 @@ export type CurrentSalon = {
   slug: string | null;
 };
 
-async function resolveSalonWithAuthenticatedClient(
-  supabase: ReturnType<typeof createServerClient>,
-  userId: string,
-): Promise<CurrentSalon | null> {
+export async function getCurrentSalon(): Promise<CurrentSalon | null> {
+  const supabase = (await createSupabaseServerClient()) as SupabaseClient | null;
+
+  if (!supabase) {
+    return null;
+  }
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user?.id) {
+    return null;
+  }
+
   const { data: ownedSalon, error: ownedSalonError } = await supabase
     .from("salons")
     .select("id,name,slug")
-    .eq("owner_user_id", userId)
+    .eq("owner_user_id", user.id)
     .is("deleted_at", null)
     .order("created_at", { ascending: true })
     .limit(1)
@@ -24,81 +37,47 @@ async function resolveSalonWithAuthenticatedClient(
   if (!ownedSalonError && ownedSalon?.id) {
     return {
       id: String(ownedSalon.id),
-      name: String(ownedSalon.name || "Nuovo salone"),
+      name:
+        typeof ownedSalon.name === "string" && ownedSalon.name.trim()
+          ? ownedSalon.name
+          : "Nuovo salone",
       role: "owner",
       slug: typeof ownedSalon.slug === "string" ? ownedSalon.slug : null,
     };
   }
 
-  const { data: memberships } = await supabase
+  const { data: membership, error: membershipError } = await supabase
     .from("salon_members")
-    .select("role,salon_id,created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: true });
+    .select("role,salon_id")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
 
-  const membership = (memberships ?? [])[0] as
-    | { role: string | null; salon_id: string | null }
-    | undefined;
-
-  if (membership?.salon_id) {
-    const { data: salon, error: salonError } = await supabase
-      .from("salons")
-      .select("id,name,slug")
-      .eq("id", membership.salon_id)
-      .is("deleted_at", null)
-      .maybeSingle();
-
-    if (!salonError && salon?.id) {
-      return {
-        id: String(salon.id),
-        name: String(salon.name || "Nuovo salone"),
-        role: membership.role ?? "owner",
-        slug: typeof salon.slug === "string" ? salon.slug : null,
-      };
-    }
-  }
-
-  return null;
-}
-
-export async function getCurrentSalon(): Promise<CurrentSalon | null> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
+  if (membershipError || !membership?.salon_id) {
     return null;
   }
 
-  const cookieStore = await cookies();
-  const supabase = createServerClient(supabaseUrl, supabaseKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, options, value }) => {
-          try {
-            cookieStore.set(name, value, options);
-          } catch {
-            // Server Components cannot always write cookies. Proxy/callback
-            // refreshes the session; this helper only needs to read it.
-          }
-        });
-      },
-    },
-  });
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const { data: memberSalon, error: memberSalonError } = await supabase
+    .from("salons")
+    .select("id,name,slug")
+    .eq("id", membership.salon_id)
+    .is("deleted_at", null)
+    .maybeSingle();
 
-  if (error || !user) {
+  if (memberSalonError || !memberSalon?.id) {
     return null;
   }
 
-  return resolveSalonWithAuthenticatedClient(supabase, user.id);
+  return {
+    id: String(memberSalon.id),
+    name:
+      typeof memberSalon.name === "string" && memberSalon.name.trim()
+        ? memberSalon.name
+        : "Nuovo salone",
+    role: typeof membership.role === "string" ? membership.role : "owner",
+    slug: typeof memberSalon.slug === "string" ? memberSalon.slug : null,
+  };
 }
 
 export async function getCurrentSalonId() {
