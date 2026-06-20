@@ -33,6 +33,8 @@ const priorityStyles: Record<ClientPriority, string> = {
   Stabile: "border-emerald-200 bg-emerald-50 text-emerald-700",
 };
 
+const validStatusFilters = new Set(["VIP", "Fedele", "A rischio", "Perso"]);
+
 function isRecoverableCustomer(customer: Customer) {
   return customer.status === "At Risk" || customer.status === "Lost";
 }
@@ -114,9 +116,10 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
   const { deleted, q, status } = await searchParams;
   const searchQuery = q?.trim() ?? "";
   const activeStatus = status?.trim() ?? "";
-  const shouldLoadFullContext = Boolean(searchQuery || activeStatus);
+  const validActiveStatus = validStatusFilters.has(activeStatus) ? activeStatus : "";
+  const shouldLoadFullContext = Boolean(searchQuery || validActiveStatus);
   const [customers, kpis, contextCustomers] = await Promise.all([
-    getCustomers(searchQuery, activeStatus),
+    getCustomers(searchQuery, validActiveStatus),
     getCustomerKpis(),
     shouldLoadFullContext ? getCustomers() : Promise.resolve(null),
   ]);
@@ -243,7 +246,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
 
             <CustomerSearch initialQuery={searchQuery} />
             <StatusFilters
-              activeStatus={activeStatus}
+              activeStatus={validActiveStatus}
               searchQuery={searchQuery}
             />
 
