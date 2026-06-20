@@ -68,6 +68,7 @@ export async function getCustomers(searchQuery = "", statusFilter = "") {
   }
 
   console.log("CURRENT_SALON_ID", currentSalon?.id);
+  console.log("DEBUG_SALON_ID_USED", currentSalon?.id);
   console.log("CUSTOMERS_QUERY", {
     searchQuery: normalizedSearch,
     salonId: currentSalon.id,
@@ -76,6 +77,7 @@ export async function getCustomers(searchQuery = "", statusFilter = "") {
   });
 
   const { data, error } = await query;
+  console.log("DEBUG_CUSTOMERS_FOUND", data?.length ?? 0);
 
   if (error) {
     console.error("Errore Supabase getCustomers:", error);
