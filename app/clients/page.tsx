@@ -8,11 +8,10 @@ import CustomerSearch from "./CustomerSearch";
 import StatusFilters from "./StatusFilters";
 import {
   type Customer,
-  isCustomerProfileIncomplete,
   statusLabels,
   statusStyles,
 } from "./data";
-import { getCustomerKpis, getCustomers } from "./serverData";
+import { getCustomers } from "./serverData";
 
 export const metadata: Metadata = {
   title: "Clienti | Beauty OS",
@@ -112,46 +111,52 @@ function buildClientInsight(
   return `Ci sono ${monitoredCustomers.length} clienti da monitorare. La priorità più alta è ${topCustomer.name}.`;
 }
 
+function isProfileIncomplete(customer: Customer) {
+  return (
+    !customer.birth_date ||
+    !customer.phone ||
+    customer.phone === "Telefono non inserito" ||
+    !customer.gender ||
+    customer.gender === "Non specificato" ||
+    !customer.notes ||
+    customer.notes === "Nessuna nota cliente inserita."
+  );
+}
+
 export default async function ClientsPage({ searchParams }: ClientsPageProps) {
   const { deleted, q, status } = await searchParams;
   const searchQuery = q?.trim() ?? "";
   const activeStatus = status?.trim() ?? "";
   const validActiveStatus = validStatusFilters.has(activeStatus) ? activeStatus : "";
-  const shouldLoadFullContext = Boolean(searchQuery || validActiveStatus);
-  const [customers, kpis, contextCustomers] = await Promise.all([
-    getCustomers(searchQuery, validActiveStatus),
-    getCustomerKpis(),
-    shouldLoadFullContext ? getCustomers() : Promise.resolve(null),
-  ]);
-  const allCustomers = contextCustomers ?? customers;
+  const customers = await getCustomers(searchQuery, validActiveStatus);
   const averageCustomerValue =
-    allCustomers.length > 0
-      ? allCustomers.reduce(
+    customers.length > 0
+      ? customers.reduce(
           (total, customer) => total + customer.totalSpentValue,
           0,
-        ) / allCustomers.length
+        ) / customers.length
       : 0;
-  const sidebarInsight = buildClientInsight(allCustomers, averageCustomerValue);
-  const profilesToComplete = allCustomers.filter(isCustomerProfileIncomplete).length;
+  const sidebarInsight = buildClientInsight(customers, averageCustomerValue);
+  const profilesToComplete = customers.filter(isProfileIncomplete).length;
   const summary = [
     {
       label: "Clienti totali",
-      value: `${kpis.totalCustomers}`,
+      value: `${customers.length}`,
       detail: "Persone presenti in anagrafica",
     },
     {
       label: "VIP",
-      value: `${kpis.vipCount}`,
+      value: `${customers.filter((customer) => customer.status === "VIP").length}`,
       detail: "Clienti principali da seguire con cura",
     },
     {
       label: "A rischio",
-      value: `${kpis.atRiskCount}`,
+      value: `${customers.filter((customer) => customer.status === "At Risk").length}`,
       detail: "Persone da monitorare rapidamente",
     },
     {
       label: "Persi",
-      value: `${kpis.lostCount}`,
+      value: `${customers.filter((customer) => customer.status === "Lost").length}`,
       detail: "Profili da valutare per recupero",
     },
     {
