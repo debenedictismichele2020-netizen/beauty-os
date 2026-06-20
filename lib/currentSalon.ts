@@ -111,6 +111,8 @@ export async function getCurrentSalon(): Promise<CurrentSalon | null> {
   if (error || !user) {
     console.log("USER_ID", null);
     console.log("SALON_ID", null);
+    console.log("AUTH_USER_ID", user?.id);
+    console.log("CURRENT_SALON_ID", null);
     return null;
   }
 
@@ -120,6 +122,8 @@ export async function getCurrentSalon(): Promise<CurrentSalon | null> {
 
   console.log("USER_ID", user.id);
   console.log("SALON_ID", salon?.id ?? null);
+  console.log("AUTH_USER_ID", user?.id);
+  console.log("CURRENT_SALON_ID", salon?.id);
 
   return salon;
 }

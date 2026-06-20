@@ -31,6 +31,14 @@ export async function getCustomers(searchQuery = "", statusFilter = "") {
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
+    console.log("CURRENT_SALON_ID", currentSalon?.id);
+    console.log("CUSTOMERS_QUERY", {
+      searchQuery,
+      salonId: currentSalon?.id,
+      statusFilter,
+      table: "customers",
+    });
+    console.log("CUSTOMERS_COUNT", 0);
     return [];
   }
 
@@ -58,12 +66,23 @@ export async function getCustomers(searchQuery = "", statusFilter = "") {
     query = query.eq("ai_status", normalizedStatusFilter);
   }
 
+  console.log("CURRENT_SALON_ID", currentSalon?.id);
+  console.log("CUSTOMERS_QUERY", {
+    searchQuery: normalizedSearch,
+    salonId: currentSalon.id,
+    statusFilter: normalizedStatusFilter,
+    table: "customers",
+  });
+
   const { data, error } = await query;
 
   if (error) {
     console.error("Errore Supabase getCustomers:", error);
+    console.log("CUSTOMERS_COUNT", 0);
     return [];
   }
+
+  console.log("CUSTOMERS_COUNT", data?.length);
 
   return (data as CustomerRow[]).map(mapCustomer);
 }
