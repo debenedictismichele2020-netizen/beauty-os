@@ -1,8 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-import { resolveExistingSalonForUser } from "@/lib/salonProvisioning";
-
 export type CurrentSalon = {
   id: string;
   name: string;
@@ -100,11 +98,7 @@ export async function getCurrentSalon(): Promise<CurrentSalon | null> {
     return null;
   }
 
-  const salon =
-    (await resolveExistingSalonForUser(user)) ??
-    (await resolveSalonWithAuthenticatedClient(supabase, user.id));
-
-  return salon;
+  return resolveSalonWithAuthenticatedClient(supabase, user.id);
 }
 
 export async function getCurrentSalonId() {
