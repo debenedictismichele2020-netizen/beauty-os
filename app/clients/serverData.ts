@@ -27,7 +27,7 @@ const emptyEconomicDashboardKpis: EconomicDashboardKpis = {
 };
 
 export async function getCustomers(searchQuery = "", statusFilter = "") {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -78,7 +78,7 @@ export async function getRetentionCustomers() {
 }
 
 export async function getCustomerKpis(): Promise<CustomerKpis> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -190,7 +190,7 @@ function calculateEconomicDashboardKpis(
 }
 
 export async function getEconomicDashboardKpis(): Promise<EconomicDashboardKpis> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -260,7 +260,7 @@ export async function getEconomicDashboardKpis(): Promise<EconomicDashboardKpis>
 }
 
 export async function getCustomerById(id: string) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -285,7 +285,7 @@ export async function getCustomerById(id: string) {
 }
 
 export async function getAppointmentsByCustomerId(customerId: string) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -333,7 +333,7 @@ export async function getAppointmentsByCustomerId(customerId: string) {
 }
 
 export async function getCustomerIds() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {

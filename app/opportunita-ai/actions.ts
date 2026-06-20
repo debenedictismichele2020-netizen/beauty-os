@@ -102,7 +102,7 @@ export async function generateOpportunityMessage(
     };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {

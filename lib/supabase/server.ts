@@ -1,4 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 
 import type { AppointmentRow, CustomerRow } from "@/app/clients/data";
 
@@ -32,10 +33,9 @@ type Database = {
   };
 };
 
-export function createSupabaseServerClient() {
+export async function createSupabaseServerClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -53,9 +53,23 @@ export function createSupabaseServerClient() {
     return null;
   }
 
-  return createClient<Database>(supabaseUrl, supabaseKey, {
-    auth: {
-      persistSession: false,
+  const cookieStore = await cookies();
+
+  return createServerClient<Database>(supabaseUrl, supabaseKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, options, value }) => {
+          try {
+            cookieStore.set(name, value, options);
+          } catch {
+            // Server Components cannot always write cookies. Proxy/callback
+            // refreshes the session; this helper only needs to read it.
+          }
+        });
+      },
     },
   });
 }

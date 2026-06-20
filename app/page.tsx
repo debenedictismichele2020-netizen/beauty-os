@@ -142,7 +142,7 @@ function getPriorityReason(
 }
 
 async function getCurrentMonthRevenue() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -211,7 +211,7 @@ async function getCurrentMonthRevenue() {
 }
 
 async function getOverviewAppointmentUsage(): Promise<OverviewVisit[]> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {

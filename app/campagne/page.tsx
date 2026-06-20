@@ -76,7 +76,7 @@ function formatCurrency(value: number) {
 }
 
 async function getCampaignSegmentSummaries() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
   const emptySummaries = Object.fromEntries(
     campaignSegments.map((segment) => [

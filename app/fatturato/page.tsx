@@ -259,7 +259,7 @@ function getWeekLabel(weekKey: string) {
 }
 
 async function getCustomers() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -301,7 +301,7 @@ async function getCustomers() {
 }
 
 async function getAppointments(period: DateRange) {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {

@@ -101,7 +101,7 @@ function getStatusBadgeStyles(status: string | null) {
 }
 
 async function getOpportunityData() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {

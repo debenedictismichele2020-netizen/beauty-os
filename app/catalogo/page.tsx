@@ -25,7 +25,7 @@ function getMoneyValue(value: number | string | null | undefined) {
 }
 
 async function getCatalogAppointmentUsage() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {

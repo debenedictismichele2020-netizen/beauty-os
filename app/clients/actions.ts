@@ -170,7 +170,7 @@ function average(values: number[], fallback: number) {
 }
 
 async function getRetentionBenchmark(
-  supabase: NonNullable<ReturnType<typeof createSupabaseServerClient>>,
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
   salonId: string,
 ): Promise<RetentionBenchmark> {
   const { data, error } = await supabase
@@ -317,7 +317,7 @@ function isMissingServicePriceError(error: { details?: string | null; message: s
 }
 
 async function getAppointmentKpiRows(
-  supabase: NonNullable<ReturnType<typeof createSupabaseServerClient>>,
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
   customerId: string,
   salonId: string,
 ) {
@@ -362,7 +362,7 @@ async function getAppointmentKpiRows(
 }
 
 async function insertAppointment(
-  supabase: NonNullable<ReturnType<typeof createSupabaseServerClient>>,
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
   appointment: {
     appointment_date: string;
     customer_id: string;
@@ -391,7 +391,7 @@ async function insertAppointment(
 }
 
 async function updateAppointmentRow(
-  supabase: NonNullable<ReturnType<typeof createSupabaseServerClient>>,
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
   appointment: {
     appointmentDate: string;
     appointmentId: string;
@@ -482,7 +482,7 @@ function logCustomerKpiRecalculation({
 }
 
 async function updateCustomerKpisFromAppointments(
-  supabase: NonNullable<ReturnType<typeof createSupabaseServerClient>>,
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
   customerId: string,
   salonId: string,
   kpis: CustomerKpiUpdate,
@@ -566,7 +566,7 @@ export async function recalculateCustomerMetrics(
 ) {
   console.log("RECALC START", customerId);
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -789,7 +789,7 @@ export async function generateAiRecoveryMessage(
     };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -956,7 +956,7 @@ export async function addAppointment(
     };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -1040,7 +1040,7 @@ export async function updateAppointment(
     };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -1100,7 +1100,7 @@ export async function deleteAppointment(
     };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -1169,7 +1169,7 @@ export async function addCustomer(
     };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -1259,7 +1259,7 @@ export async function updateCustomer(
     };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -1348,7 +1348,7 @@ export async function deleteCustomer(
     };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {

@@ -327,7 +327,7 @@ function formatCustomerForPrompt(customer: {
 }
 
 async function getRecentServicesByCustomerId(
-  supabase: NonNullable<ReturnType<typeof createSupabaseServerClient>>,
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
   salonId: string,
   customerIds: string[],
 ) {
@@ -556,7 +556,7 @@ export async function getCampaignSelectedCustomers(
     };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -605,7 +605,7 @@ export async function getCustomCampaignSelectedCustomers(
     };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -675,7 +675,7 @@ export async function generateAiCampaign(
     };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
@@ -899,7 +899,7 @@ export async function generateCustomAiCampaign(
     };
   }
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
 
   if (!supabase || !currentSalon) {
