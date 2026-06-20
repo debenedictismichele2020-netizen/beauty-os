@@ -29,6 +29,7 @@ const emptyEconomicDashboardKpis: EconomicDashboardKpis = {
 export async function getCustomers(searchQuery = "", statusFilter = "") {
   const supabase = createSupabaseServerClient();
   const currentSalon = await getCurrentSalon();
+  console.log("DEBUG_CURRENT_SALON", currentSalon);
 
   if (!supabase || !currentSalon) {
     console.log("CURRENT_SALON_ID", currentSalon?.id);
