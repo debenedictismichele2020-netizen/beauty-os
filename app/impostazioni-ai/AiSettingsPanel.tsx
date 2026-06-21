@@ -157,8 +157,10 @@ export default function AiSettingsPanel() {
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      setSettings(readAiSettings());
-      setHasLoadedSettings(true);
+      void (async () => {
+        setSettings(await readAiSettings());
+        setHasLoadedSettings(true);
+      })();
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
@@ -169,7 +171,7 @@ export default function AiSettingsPanel() {
       return;
     }
 
-    saveAiSettings(settings);
+    void saveAiSettings(settings);
   }, [hasLoadedSettings, settings]);
 
   useEffect(() => {
@@ -202,6 +204,14 @@ export default function AiSettingsPanel() {
     });
   }
 
+  async function restoreDefaultSettings() {
+    const nextSettings = await resetAiSettings();
+
+    setSettings(nextSettings);
+    setHasLoadedSettings(true);
+    setToast("Impostazioni AI ripristinate");
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-5 border-b border-black/10 pb-6 md:flex-row md:items-center md:justify-between">
@@ -219,9 +229,7 @@ export default function AiSettingsPanel() {
         <button
           className="w-fit rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-zinc-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-zinc-50"
           onClick={() => {
-            setSettings(resetAiSettings());
-            setHasLoadedSettings(true);
-            setToast("Impostazioni AI ripristinate");
+            void restoreDefaultSettings();
           }}
           type="button"
         >

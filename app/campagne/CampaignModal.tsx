@@ -317,9 +317,11 @@ export default function CampaignModal({
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      setContactedCustomers(readContactedCustomers());
-      setServiceCatalog(readServiceCatalog());
-      setAiSettings(readAiSettings());
+      void (async () => {
+        setContactedCustomers(readContactedCustomers());
+        setServiceCatalog(readServiceCatalog());
+        setAiSettings(await readAiSettings());
+      })();
     }, 0);
 
     return () => window.clearTimeout(timeoutId);

@@ -179,44 +179,47 @@ export default function CustomCampaignDrawer() {
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      const activeCatalog = getActiveServices(readServiceCatalog());
-      const draft = readDraft();
+      void (async () => {
+        const activeCatalog = getActiveServices(readServiceCatalog());
+        const draft = readDraft();
+        const aiSettings = await readAiSettings();
 
-      setCatalog(activeCatalog);
-      setSettings(readAiSettings());
-      setMessageTone(readAiSettings().tone);
-      setContactedCustomers(readContactedCustomers());
+        setCatalog(activeCatalog);
+        setSettings(aiSettings);
+        setMessageTone(aiSettings.tone);
+        setContactedCustomers(readContactedCustomers());
 
-      if (searchParams.get("new") === "1") {
-        setIsOpen(true);
-        void loadCustomers("all");
-      }
-
-      if (searchParams.get("new") === "1" && draft) {
-        const draftServiceNames = new Set(
-          draft.selectedServices.map((service) => service.name.toLowerCase()),
-        );
-
-        setCampaignName(draft.title || "Campagna personalizzata");
-        setObjective(draft.objective || "Spingere servizi poco usati");
-        if (draft.selectedCustomerIds && draft.selectedCustomerIds.length > 0) {
-          setSegment("manual_customers");
-          setSelectedManualCustomerIds(draft.selectedCustomerIds);
-          void loadCustomers("manual_customers");
-        } else {
-          setSegment("all");
+        if (searchParams.get("new") === "1") {
+          setIsOpen(true);
+          void loadCustomers("all");
         }
-        setSelectedServiceIds(
-          activeCatalog
-            .filter((service) => draftServiceNames.has(service.name.toLowerCase()))
-            .map((service) => service.id),
-        );
-        setInfo(
-          draft.source.startsWith("overview_")
-            ? "Campagna creata dalla Panoramica. Puoi modificarla prima di generare i messaggi."
-            : "Campagna creata dal Catalogo servizi. Puoi modificarla prima di generare i messaggi.",
-        );
-      }
+
+        if (searchParams.get("new") === "1" && draft) {
+          const draftServiceNames = new Set(
+            draft.selectedServices.map((service) => service.name.toLowerCase()),
+          );
+
+          setCampaignName(draft.title || "Campagna personalizzata");
+          setObjective(draft.objective || "Spingere servizi poco usati");
+          if (draft.selectedCustomerIds && draft.selectedCustomerIds.length > 0) {
+            setSegment("manual_customers");
+            setSelectedManualCustomerIds(draft.selectedCustomerIds);
+            void loadCustomers("manual_customers");
+          } else {
+            setSegment("all");
+          }
+          setSelectedServiceIds(
+            activeCatalog
+              .filter((service) => draftServiceNames.has(service.name.toLowerCase()))
+              .map((service) => service.id),
+          );
+          setInfo(
+            draft.source.startsWith("overview_")
+              ? "Campagna creata dalla Panoramica. Puoi modificarla prima di generare i messaggi."
+              : "Campagna creata dal Catalogo servizi. Puoi modificarla prima di generare i messaggi.",
+          );
+        }
+      })();
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
