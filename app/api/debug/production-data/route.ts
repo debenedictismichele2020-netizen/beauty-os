@@ -8,6 +8,17 @@ const fixedBeautyOsSalonId = "9dd2cbf4-5fdd-4219-88ab-64b8e83ff001";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+type DebugSalonRecord = {
+  id: string;
+  name: string | null;
+  slug: string | null;
+};
+
+type DebugMembershipRecord = {
+  role: string | null;
+  salon_id: string | null;
+};
+
 function getSupabaseUrlHost() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
@@ -46,6 +57,9 @@ export async function GET() {
       name: null as string | null,
       role: null as string | null,
     },
+    currentSalonSource: null as "owner" | "membership" | null,
+    directOwnerSalonQuery: null as DebugSalonRecord | null,
+    directMembershipQuery: null as DebugMembershipRecord | null,
     counts: {
       customersForCurrentSalon: null as number | null,
       customersForFixedBeautyOsSalon: null as number | null,
@@ -76,12 +90,41 @@ export async function GET() {
   response.auth.email = user?.email ?? null;
   response.auth.error = authError?.message ?? null;
 
+  if (user?.id) {
+    const { data: directOwnerSalon } = await supabase
+      .from("salons")
+      .select("id,name,slug")
+      .eq("owner_user_id", user.id)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle<DebugSalonRecord>();
+
+    const { data: directMembership } = await supabase
+      .from("salon_members")
+      .select("role,salon_id")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle<DebugMembershipRecord>();
+
+    response.directOwnerSalonQuery = directOwnerSalon ?? null;
+    response.directMembershipQuery = directMembership ?? null;
+  }
+
   try {
     const currentSalon = await getCurrentSalon();
 
     response.currentSalon.id = currentSalon?.id ?? null;
     response.currentSalon.name = currentSalon?.name ?? null;
     response.currentSalon.role = currentSalon?.role ?? null;
+    response.currentSalonSource =
+      currentSalon?.id && response.directOwnerSalonQuery?.id === currentSalon.id
+        ? "owner"
+        : currentSalon?.id &&
+            response.directMembershipQuery?.salon_id === currentSalon.id
+          ? "membership"
+          : null;
   } catch (error) {
     response.errors.currentSalonError = getErrorMessage(error);
   }

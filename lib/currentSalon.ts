@@ -58,14 +58,12 @@ export async function getCurrentSalon(): Promise<CurrentSalon | null> {
       .is("deleted_at", null)
       .maybeSingle<SalonRecord>();
 
-    if (memberSalon?.id) {
-      return {
-        id: String(memberSalon.id),
-        name: formatSalonName(memberSalon.name),
-        role: typeof membership.role === "string" ? membership.role : "owner",
-        slug: formatSalonSlug(memberSalon.slug),
-      };
-    }
+    return {
+      id: String(memberSalon?.id ?? membership.salon_id),
+      name: memberSalon?.id ? formatSalonName(memberSalon.name) : "Nuovo salone",
+      role: typeof membership.role === "string" ? membership.role : "owner",
+      slug: memberSalon?.id ? formatSalonSlug(memberSalon.slug) : null,
+    };
   }
 
   const { data: ownedSalon } = await supabase
