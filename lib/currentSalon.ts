@@ -1,5 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type CurrentSalon = {
@@ -9,8 +7,16 @@ export type CurrentSalon = {
   slug: string | null;
 };
 
+function formatSalonName(name: unknown) {
+  return typeof name === "string" && name.trim() ? name : "Nuovo salone";
+}
+
+function formatSalonSlug(slug: unknown) {
+  return typeof slug === "string" ? slug : null;
+}
+
 export async function getCurrentSalon(): Promise<CurrentSalon | null> {
-  const supabase = (await createSupabaseServerClient()) as SupabaseClient | null;
+  const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
     return null;
@@ -25,7 +31,9 @@ export async function getCurrentSalon(): Promise<CurrentSalon | null> {
     return null;
   }
 
-  const { data: ownedSalon, error: ownedSalonError } = await supabase
+  // 1. Prima cerca il salone dove l’utente è proprietario diretto.
+  // Questo è il caso corretto per debenedictismichele2020@gmail.com.
+  const { data: ownedSalon } = await supabase
     .from("salons")
     .select("id,name,slug")
     .eq("owner_user_id", user.id)
@@ -34,19 +42,18 @@ export async function getCurrentSalon(): Promise<CurrentSalon | null> {
     .limit(1)
     .maybeSingle();
 
-  if (!ownedSalonError && ownedSalon?.id) {
+  if (ownedSalon?.id) {
     return {
       id: String(ownedSalon.id),
-      name:
-        typeof ownedSalon.name === "string" && ownedSalon.name.trim()
-          ? ownedSalon.name
-          : "Nuovo salone",
+      name: formatSalonName(ownedSalon.name),
       role: "owner",
-      slug: typeof ownedSalon.slug === "string" ? ownedSalon.slug : null,
+      slug: formatSalonSlug(ownedSalon.slug),
     };
   }
 
-  const { data: membership, error: membershipError } = await supabase
+  // 2. Solo se non trova un salone come proprietario,
+  // cerca tramite salon_members.
+  const { data: membership } = await supabase
     .from("salon_members")
     .select("role,salon_id")
     .eq("user_id", user.id)
@@ -54,29 +61,26 @@ export async function getCurrentSalon(): Promise<CurrentSalon | null> {
     .limit(1)
     .maybeSingle();
 
-  if (membershipError || !membership?.salon_id) {
+  if (!membership?.salon_id) {
     return null;
   }
 
-  const { data: memberSalon, error: memberSalonError } = await supabase
+  const { data: memberSalon } = await supabase
     .from("salons")
     .select("id,name,slug")
     .eq("id", membership.salon_id)
     .is("deleted_at", null)
     .maybeSingle();
 
-  if (memberSalonError || !memberSalon?.id) {
+  if (!memberSalon?.id) {
     return null;
   }
 
   return {
     id: String(memberSalon.id),
-    name:
-      typeof memberSalon.name === "string" && memberSalon.name.trim()
-        ? memberSalon.name
-        : "Nuovo salone",
+    name: formatSalonName(memberSalon.name),
     role: typeof membership.role === "string" ? membership.role : "owner",
-    slug: typeof memberSalon.slug === "string" ? memberSalon.slug : null,
+    slug: formatSalonSlug(memberSalon.slug),
   };
 }
 
