@@ -7,15 +7,11 @@ export type CurrentSalon = {
   slug: string | null;
 };
 
-type SalonRecord = {
-  id: string;
+type CurrentSalonRpcRow = {
+  id: string | null;
   name: string | null;
-  slug: string | null;
-};
-
-type MembershipRecord = {
   role: string | null;
-  salon_id: string | null;
+  slug: string | null;
 };
 
 function formatSalonName(name: unknown) {
@@ -23,7 +19,7 @@ function formatSalonName(name: unknown) {
 }
 
 function formatSalonSlug(slug: unknown) {
-  return typeof slug === "string" ? slug : null;
+  return typeof slug === "string" && slug.trim() ? slug : null;
 }
 
 export async function getCurrentSalon(): Promise<CurrentSalon | null> {
@@ -42,48 +38,29 @@ export async function getCurrentSalon(): Promise<CurrentSalon | null> {
     return null;
   }
 
-  const { data: membership } = await supabase
-    .from("salon_members")
-    .select("role,salon_id")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle<MembershipRecord>();
+  const { data, error } = await supabase.rpc(
+    "get_current_salon_for_authenticated_user" as never,
+  );
 
-  if (membership?.salon_id) {
-    const { data: memberSalon } = await supabase
-      .from("salons")
-      .select("id,name,slug")
-      .eq("id", membership.salon_id)
-      .is("deleted_at", null)
-      .maybeSingle<SalonRecord>();
-
-    return {
-      id: String(memberSalon?.id ?? membership.salon_id),
-      name: memberSalon?.id ? formatSalonName(memberSalon.name) : "Nuovo salone",
-      role: typeof membership.role === "string" ? membership.role : "owner",
-      slug: memberSalon?.id ? formatSalonSlug(memberSalon.slug) : null,
-    };
+  if (error) {
+    return null;
   }
 
-  const { data: ownedSalon } = await supabase
-    .from("salons")
-    .select("id,name,slug")
-    .eq("owner_user_id", user.id)
-    .is("deleted_at", null)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle<SalonRecord>();
+  const rows = Array.isArray(data) ? (data as CurrentSalonRpcRow[]) : [];
+  const salon = rows[0] ?? null;
 
-  if (!ownedSalon?.id) {
+  if (!salon?.id) {
     return null;
   }
 
   return {
-    id: String(ownedSalon.id),
-    name: formatSalonName(ownedSalon.name),
-    role: "owner",
-    slug: formatSalonSlug(ownedSalon.slug),
+    id: String(salon.id),
+    name: formatSalonName(salon.name),
+    role:
+      typeof salon.role === "string" && salon.role.trim()
+        ? salon.role
+        : "owner",
+    slug: formatSalonSlug(salon.slug),
   };
 }
 
