@@ -7,6 +7,17 @@ export type CurrentSalon = {
   slug: string | null;
 };
 
+type SalonRecord = {
+  id: string;
+  name: string | null;
+  slug: string | null;
+};
+
+type MembershipRecord = {
+  role: string | null;
+  salon_id: string | null;
+};
+
 function formatSalonName(name: unknown) {
   return typeof name === "string" && name.trim() ? name : "Nuovo salone";
 }
@@ -40,7 +51,7 @@ export async function getCurrentSalon(): Promise<CurrentSalon | null> {
     .is("deleted_at", null)
     .order("created_at", { ascending: true })
     .limit(1)
-    .maybeSingle();
+    .maybeSingle<SalonRecord>();
 
   if (ownedSalon?.id) {
     return {
@@ -59,7 +70,7 @@ export async function getCurrentSalon(): Promise<CurrentSalon | null> {
     .eq("user_id", user.id)
     .order("created_at", { ascending: true })
     .limit(1)
-    .maybeSingle();
+    .maybeSingle<MembershipRecord>();
 
   if (!membership?.salon_id) {
     return null;
@@ -70,7 +81,7 @@ export async function getCurrentSalon(): Promise<CurrentSalon | null> {
     .select("id,name,slug")
     .eq("id", membership.salon_id)
     .is("deleted_at", null)
-    .maybeSingle();
+    .maybeSingle<SalonRecord>();
 
   if (!memberSalon?.id) {
     return null;
