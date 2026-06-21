@@ -42,8 +42,32 @@ export async function getCurrentSalon(): Promise<CurrentSalon | null> {
     return null;
   }
 
-  // 1. Prima cerca il salone dove l’utente è proprietario diretto.
-  // Questo è il caso corretto per debenedictismichele2020@gmail.com.
+  const { data: membership } = await supabase
+    .from("salon_members")
+    .select("role,salon_id")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle<MembershipRecord>();
+
+  if (membership?.salon_id) {
+    const { data: memberSalon } = await supabase
+      .from("salons")
+      .select("id,name,slug")
+      .eq("id", membership.salon_id)
+      .is("deleted_at", null)
+      .maybeSingle<SalonRecord>();
+
+    if (memberSalon?.id) {
+      return {
+        id: String(memberSalon.id),
+        name: formatSalonName(memberSalon.name),
+        role: typeof membership.role === "string" ? membership.role : "owner",
+        slug: formatSalonSlug(memberSalon.slug),
+      };
+    }
+  }
+
   const { data: ownedSalon } = await supabase
     .from("salons")
     .select("id,name,slug")
@@ -53,45 +77,15 @@ export async function getCurrentSalon(): Promise<CurrentSalon | null> {
     .limit(1)
     .maybeSingle<SalonRecord>();
 
-  if (ownedSalon?.id) {
-    return {
-      id: String(ownedSalon.id),
-      name: formatSalonName(ownedSalon.name),
-      role: "owner",
-      slug: formatSalonSlug(ownedSalon.slug),
-    };
-  }
-
-  // 2. Solo se non trova un salone come proprietario,
-  // cerca tramite salon_members.
-  const { data: membership } = await supabase
-    .from("salon_members")
-    .select("role,salon_id")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle<MembershipRecord>();
-
-  if (!membership?.salon_id) {
-    return null;
-  }
-
-  const { data: memberSalon } = await supabase
-    .from("salons")
-    .select("id,name,slug")
-    .eq("id", membership.salon_id)
-    .is("deleted_at", null)
-    .maybeSingle<SalonRecord>();
-
-  if (!memberSalon?.id) {
+  if (!ownedSalon?.id) {
     return null;
   }
 
   return {
-    id: String(memberSalon.id),
-    name: formatSalonName(memberSalon.name),
-    role: typeof membership.role === "string" ? membership.role : "owner",
-    slug: formatSalonSlug(memberSalon.slug),
+    id: String(ownedSalon.id),
+    name: formatSalonName(ownedSalon.name),
+    role: "owner",
+    slug: formatSalonSlug(ownedSalon.slug),
   };
 }
 
