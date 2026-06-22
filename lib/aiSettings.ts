@@ -263,13 +263,30 @@ function normalizeAiSettingsRow(row: SalonAiSettingsRow): AiGenerationSettings {
   });
 }
 
+function toAiPreferencesJson(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  const preferences = value as Partial<Record<keyof AiPreferences, unknown>>;
+  const jsonPreferences: Partial<Record<keyof AiPreferences, boolean>> = {};
+
+  (Object.keys(defaultAiPreferences) as Array<keyof AiPreferences>).forEach((key) => {
+    if (typeof preferences[key] === "boolean") {
+      jsonPreferences[key] = preferences[key];
+    }
+  });
+
+  return jsonPreferences;
+}
+
 function toAiSettingsRow(settings: AiGenerationSettings, salonId: string) {
   return {
     business_signature: settings.businessSignature,
     creativity: settings.creativity,
     emoji_style: settings.emojiStyle,
     message_length: settings.messageLength,
-    preferences: settings.preferences,
+    preferences: toAiPreferencesJson(settings.preferences),
     salon_id: salonId,
     tone: settings.tone,
     updated_at: new Date().toISOString(),
