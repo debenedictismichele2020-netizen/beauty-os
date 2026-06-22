@@ -103,7 +103,13 @@ type SalonAiSettingsRow = {
 
 type AiSettingsReadResult = {
   settings: AiGenerationSettings;
-  shouldUpdateCache: boolean;
+  source: "supabase" | "missing";
+};
+
+export type AiSettingsSaveResult = {
+  error: string | null;
+  saved: boolean;
+  settings: AiGenerationSettings;
 };
 
 function isOption<T extends readonly string[]>(value: unknown, options: T): value is T[number] {
@@ -173,12 +179,20 @@ export function normalizeAiSettings(
 export async function readAiSettings(): Promise<AiGenerationSettings> {
   const remoteResult = await readAiSettingsFromSupabase();
 
-  if (remoteResult) {
-    if (remoteResult.shouldUpdateCache) {
-      writeAiSettingsCache(remoteResult.settings);
-    }
+  if (remoteResult?.source === "supabase") {
+    writeAiSettingsCache(remoteResult.settings);
 
     return remoteResult.settings;
+  }
+
+  if (remoteResult?.source === "missing") {
+    const fallbackSettings = hasLocalAiSettings()
+      ? readAiSettingsFromLocalStorage()
+      : defaultAiSettings;
+
+    const saveResult = await saveAiSettings(fallbackSettings);
+
+    return saveResult.saved ? saveResult.settings : fallbackSettings;
   }
 
   return readAiSettingsFromLocalStorage();
@@ -186,6 +200,21 @@ export async function readAiSettings(): Promise<AiGenerationSettings> {
 
 function canUseStorage() {
   return typeof window !== "undefined" && Boolean(window.localStorage);
+}
+
+function hasLocalAiSettings() {
+  if (!canUseStorage()) {
+    return false;
+  }
+
+  return [
+    aiToneStorageKey,
+    aiMessageLengthStorageKey,
+    aiEmojiStyleStorageKey,
+    aiPreferencesStorageKey,
+    aiCreativityStorageKey,
+    businessSignatureStorageKey,
+  ].some((key) => window.localStorage.getItem(key) !== null);
 }
 
 function readAiSettingsFromLocalStorage(): AiGenerationSettings {
@@ -272,13 +301,13 @@ async function readAiSettingsFromSupabase(): Promise<AiSettingsReadResult | null
     if (remoteRow) {
       return {
         settings: normalizeAiSettingsRow(remoteRow),
-        shouldUpdateCache: true,
+        source: "supabase",
       };
     }
 
     return {
       settings: defaultAiSettings,
-      shouldUpdateCache: true,
+      source: "missing",
     };
   } catch (error) {
     console.warn("Fallback localStorage salon_ai_settings:", error);
@@ -291,7 +320,10 @@ async function upsertAiSettingsToSupabase(settings: AiGenerationSettings) {
   const currentSalon = await ensureCurrentUserSalon();
 
   if (!supabase || !currentSalon) {
-    return false;
+    return {
+      error: "Supabase o salone corrente non disponibile.",
+      success: false,
+    };
   }
 
   const normalizedSettings = normalizeAiSettings(settings);
@@ -304,7 +336,10 @@ async function upsertAiSettingsToSupabase(settings: AiGenerationSettings) {
 
   if (error) {
     console.warn("Fallback localStorage salon_ai_settings:", error.message);
-    return false;
+    return {
+      error: error.message,
+      success: false,
+    };
   }
 
   const existingId = data?.[0]?.id;
@@ -318,10 +353,16 @@ async function upsertAiSettingsToSupabase(settings: AiGenerationSettings) {
 
     if (updateError) {
       console.warn("Fallback localStorage salon_ai_settings:", updateError.message);
-      return false;
+      return {
+        error: updateError.message,
+        success: false,
+      };
     }
 
-    return true;
+    return {
+      error: null,
+      success: true,
+    };
   }
 
   const { error: insertError } = await supabase
@@ -330,10 +371,16 @@ async function upsertAiSettingsToSupabase(settings: AiGenerationSettings) {
 
   if (insertError) {
     console.warn("Fallback localStorage salon_ai_settings:", insertError.message);
-    return false;
+    return {
+      error: insertError.message,
+      success: false,
+    };
   }
 
-  return true;
+  return {
+    error: null,
+    success: true,
+  };
 }
 
 function writeAiSettingsCache(settings: AiGenerationSettings) {
@@ -366,20 +413,52 @@ function writeAiSettingsCache(settings: AiGenerationSettings) {
 export async function saveAiSettings(
   settings: AiGenerationSettings,
   options: { syncRemote?: boolean } = {},
-) {
+): Promise<AiSettingsSaveResult> {
   const normalizedSettings = normalizeAiSettings(settings);
 
-  if (options.syncRemote !== false) {
-    await upsertAiSettingsToSupabase(normalizedSettings);
+  if (options.syncRemote === false) {
+    writeAiSettingsCache(normalizedSettings);
+
+    return {
+      error: null,
+      saved: true,
+      settings: normalizedSettings,
+    };
   }
 
-  writeAiSettingsCache(normalizedSettings);
+  const saveResult = await upsertAiSettingsToSupabase(normalizedSettings);
 
-  return normalizedSettings;
+  if (!saveResult.success) {
+    const error = saveResult.error ?? "Errore salvataggio impostazioni AI.";
+
+    console.error("Errore salvataggio salon_ai_settings:", error);
+
+    return {
+      error,
+      saved: false,
+      settings: normalizedSettings,
+    };
+  }
+
+  const remoteResult = await readAiSettingsFromSupabase();
+  const confirmedSettings =
+    remoteResult?.source === "supabase" ? remoteResult.settings : normalizedSettings;
+
+  if (remoteResult?.source !== "supabase") {
+    console.warn(
+      "Impostazioni AI salvate, ma rilettura Supabase non confermata. Uso valori appena salvati.",
+    );
+  }
+
+  writeAiSettingsCache(confirmedSettings);
+
+  return {
+    error: null,
+    saved: true,
+    settings: confirmedSettings,
+  };
 }
 
 export async function resetAiSettings() {
-  await saveAiSettings(defaultAiSettings);
-
-  return defaultAiSettings;
+  return saveAiSettings(defaultAiSettings);
 }

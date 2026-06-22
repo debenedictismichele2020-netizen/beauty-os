@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   aiCreativityDescriptions,
@@ -152,27 +152,19 @@ function buildPreviewMessage(settings: AiGenerationSettings) {
 
 export default function AiSettingsPanel() {
   const [settings, setSettings] = useState<AiGenerationSettings>(defaultAiSettings);
-  const [hasLoadedSettings, setHasLoadedSettings] = useState(false);
   const [toast, setToast] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const saveQueueRef = useRef(Promise.resolve());
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void (async () => {
         setSettings(await readAiSettings());
-        setHasLoadedSettings(true);
       })();
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
   }, []);
-
-  useEffect(() => {
-    if (!hasLoadedSettings) {
-      return;
-    }
-
-    void saveAiSettings(settings);
-  }, [hasLoadedSettings, settings]);
 
   useEffect(() => {
     if (!toast) {
@@ -186,8 +178,37 @@ export default function AiSettingsPanel() {
 
   const previewMessage = useMemo(() => buildPreviewMessage(settings), [settings]);
 
-  function updateSettings(nextSettings: AiGenerationSettings) {
-    setSettings(nextSettings);
+  async function updateSettings(nextSettings: AiGenerationSettings) {
+    const optimisticSettings = {
+      ...nextSettings,
+      preferences: {
+        ...nextSettings.preferences,
+      },
+    };
+
+    setSettings(optimisticSettings);
+    setIsSaving(true);
+
+    const saveOperation = saveQueueRef.current.then(() =>
+      saveAiSettings(optimisticSettings),
+    );
+
+    saveQueueRef.current = saveOperation.then(
+      () => undefined,
+      () => undefined,
+    );
+
+    const result = await saveOperation;
+
+    setIsSaving(false);
+
+    if (!result.saved) {
+      console.error("Errore salvataggio impostazioni AI:", result.error);
+      setToast("Errore salvataggio impostazioni AI");
+      return;
+    }
+
+    setSettings(result.settings);
     setToast("Impostazioni AI salvate");
   }
 
@@ -195,7 +216,7 @@ export default function AiSettingsPanel() {
     key: Key,
     value: AiPreferences[Key],
   ) {
-    updateSettings({
+    void updateSettings({
       ...settings,
       preferences: {
         ...settings.preferences,
@@ -205,10 +226,26 @@ export default function AiSettingsPanel() {
   }
 
   async function restoreDefaultSettings() {
-    const nextSettings = await resetAiSettings();
+    setIsSaving(true);
 
-    setSettings(nextSettings);
-    setHasLoadedSettings(true);
+    const saveOperation = saveQueueRef.current.then(() => resetAiSettings());
+
+    saveQueueRef.current = saveOperation.then(
+      () => undefined,
+      () => undefined,
+    );
+
+    const result = await saveOperation;
+
+    setIsSaving(false);
+
+    if (!result.saved) {
+      console.error("Errore ripristino impostazioni AI:", result.error);
+      setToast("Errore ripristino impostazioni AI");
+      return;
+    }
+
+    setSettings(result.settings);
     setToast("Impostazioni AI ripristinate");
   }
 
@@ -242,21 +279,28 @@ export default function AiSettingsPanel() {
           {toast}
         </p>
       ) : null}
+      {isSaving ? (
+        <p className="w-fit rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-zinc-600">
+          Salvataggio impostazioni AI…
+        </p>
+      ) : null}
 
       <section className="grid gap-5 xl:grid-cols-[1fr_0.85fr]">
         <div className="space-y-5">
           <OptionGroup
             label="Tono comunicazione"
-            onChange={(tone) => updateSettings({ ...settings, tone })}
+            onChange={(tone) => {
+              void updateSettings({ ...settings, tone });
+            }}
             options={aiToneOptions}
             value={settings.tone}
           />
 
           <OptionGroup
             label="Lunghezza messaggi"
-            onChange={(messageLength) =>
-              updateSettings({ ...settings, messageLength })
-            }
+            onChange={(messageLength) => {
+              void updateSettings({ ...settings, messageLength });
+            }}
             options={aiMessageLengthOptions}
             value={settings.messageLength}
           />
@@ -264,7 +308,9 @@ export default function AiSettingsPanel() {
           <OptionGroup
             descriptions={aiCreativityDescriptions}
             label="Creatività AI"
-            onChange={(creativity) => updateSettings({ ...settings, creativity })}
+            onChange={(creativity) => {
+              void updateSettings({ ...settings, creativity });
+            }}
             options={aiCreativityOptions}
             value={settings.creativity}
           />
@@ -276,7 +322,7 @@ export default function AiSettingsPanel() {
             <input
               className="mt-4 w-full rounded-full border border-black/10 bg-[#f7f7f5] px-4 py-3 text-sm text-zinc-950 outline-none transition focus:border-black/30"
               onChange={(event) =>
-                updateSettings({
+                void updateSettings({
                   ...settings,
                   businessSignature: event.target.value,
                 })
@@ -293,7 +339,9 @@ export default function AiSettingsPanel() {
 
           <OptionGroup
             label="Stile emoji"
-            onChange={(emojiStyle) => updateSettings({ ...settings, emojiStyle })}
+            onChange={(emojiStyle) => {
+              void updateSettings({ ...settings, emojiStyle });
+            }}
             options={aiEmojiStyleOptions}
             value={settings.emojiStyle}
           />
