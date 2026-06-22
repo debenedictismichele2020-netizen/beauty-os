@@ -203,7 +203,7 @@ export default function AiSettingsPanel() {
     setIsSaving(false);
 
     if (!result.saved) {
-      console.error("Errore salvataggio impostazioni AI:", result.error);
+      console.error("AI_SETTINGS_SAVE_ERROR", result.error);
       setToast("Errore salvataggio impostazioni AI");
       return;
     }
@@ -240,7 +240,7 @@ export default function AiSettingsPanel() {
     setIsSaving(false);
 
     if (!result.saved) {
-      console.error("Errore ripristino impostazioni AI:", result.error);
+      console.error("AI_SETTINGS_SAVE_ERROR", result.error);
       setToast("Errore ripristino impostazioni AI");
       return;
     }

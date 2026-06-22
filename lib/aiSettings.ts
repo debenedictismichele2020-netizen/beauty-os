@@ -112,6 +112,12 @@ export type AiSettingsSaveResult = {
   settings: AiGenerationSettings;
 };
 
+type AiSettingsUpsertResult = {
+  error: string | null;
+  row: SalonAiSettingsRow | null;
+  success: boolean;
+};
+
 function isOption<T extends readonly string[]>(value: unknown, options: T): value is T[number] {
   return typeof value === "string" && options.includes(value);
 }
@@ -315,70 +321,68 @@ async function readAiSettingsFromSupabase(): Promise<AiSettingsReadResult | null
   }
 }
 
-async function upsertAiSettingsToSupabase(settings: AiGenerationSettings) {
+async function upsertAiSettingsToSupabase(
+  settings: AiGenerationSettings,
+): Promise<AiSettingsUpsertResult> {
   const supabase = createSupabaseBrowserClient();
   const currentSalon = await ensureCurrentUserSalon();
 
   if (!supabase || !currentSalon) {
     return {
       error: "Supabase o salone corrente non disponibile.",
+      row: null,
       success: false,
     };
   }
 
   const normalizedSettings = normalizeAiSettings(settings);
-  const { data, error } = await supabase
+  const settingsRow = toAiSettingsRow(normalizedSettings, currentSalon.id);
+  const { data: updatedRows, error: updateError } = await supabase
     .from("salon_ai_settings")
-    .select("id")
+    .update(settingsRow)
     .eq("salon_id", currentSalon.id)
-    .order("created_at", { ascending: true })
+    .select("*")
     .limit(1);
 
-  if (error) {
-    console.warn("Fallback localStorage salon_ai_settings:", error.message);
+  if (updateError) {
+    console.error("AI_SETTINGS_SAVE_ERROR", updateError);
     return {
-      error: error.message,
+      error: updateError.message,
+      row: null,
       success: false,
     };
   }
 
-  const existingId = data?.[0]?.id;
+  const updatedRow = updatedRows?.[0] as SalonAiSettingsRow | undefined;
 
-  if (existingId) {
-    const { error: updateError } = await supabase
-      .from("salon_ai_settings")
-      .update(toAiSettingsRow(normalizedSettings, currentSalon.id))
-      .eq("salon_id", currentSalon.id)
-      .eq("id", existingId);
-
-    if (updateError) {
-      console.warn("Fallback localStorage salon_ai_settings:", updateError.message);
-      return {
-        error: updateError.message,
-        success: false,
-      };
-    }
-
+  if (updatedRow) {
     return {
       error: null,
+      row: updatedRow,
       success: true,
     };
   }
 
-  const { error: insertError } = await supabase
+  const { data: insertedRows, error: insertError } = await supabase
     .from("salon_ai_settings")
-    .insert(toAiSettingsRow(normalizedSettings, currentSalon.id));
+    .insert(settingsRow)
+    .select("*")
+    .limit(1);
 
   if (insertError) {
-    console.warn("Fallback localStorage salon_ai_settings:", insertError.message);
+    console.error("AI_SETTINGS_SAVE_ERROR", insertError);
     return {
       error: insertError.message,
+      row: null,
       success: false,
     };
   }
 
+  const insertedRow = insertedRows?.[0] as SalonAiSettingsRow | undefined;
+
   return {
     error: null,
+    row: insertedRow ?? null,
     success: true,
   };
 }
@@ -431,7 +435,7 @@ export async function saveAiSettings(
   if (!saveResult.success) {
     const error = saveResult.error ?? "Errore salvataggio impostazioni AI.";
 
-    console.error("Errore salvataggio salon_ai_settings:", error);
+    console.error("AI_SETTINGS_SAVE_ERROR", error);
 
     return {
       error,
@@ -442,7 +446,11 @@ export async function saveAiSettings(
 
   const remoteResult = await readAiSettingsFromSupabase();
   const confirmedSettings =
-    remoteResult?.source === "supabase" ? remoteResult.settings : normalizedSettings;
+    remoteResult?.source === "supabase"
+      ? remoteResult.settings
+      : saveResult.row
+        ? normalizeAiSettingsRow(saveResult.row)
+        : normalizedSettings;
 
   if (remoteResult?.source !== "supabase") {
     console.warn(
