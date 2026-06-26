@@ -156,6 +156,8 @@ export default function AiSettingsPanel({ salonId }: { salonId: string }) {
   const [isSaving, setIsSaving] = useState(false);
   const saveQueueRef = useRef(Promise.resolve());
 
+  console.log("AI_SETTINGS_PANEL_SALON_ID", salonId);
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void (async () => {
@@ -203,7 +205,11 @@ export default function AiSettingsPanel({ salonId }: { salonId: string }) {
     setIsSaving(false);
 
     if (!result.saved) {
-      console.error("AI_SETTINGS_SAVE_ERROR", result.error);
+      console.error("AI_SETTINGS_SAVE_ERROR", {
+        error: result.error,
+        reason: salonId ? "supabase error" : "salonId mancante",
+        salonId,
+      });
       setToast("Errore salvataggio impostazioni AI");
       return;
     }
@@ -240,7 +246,11 @@ export default function AiSettingsPanel({ salonId }: { salonId: string }) {
     setIsSaving(false);
 
     if (!result.saved) {
-      console.error("AI_SETTINGS_SAVE_ERROR", result.error);
+      console.error("AI_SETTINGS_SAVE_ERROR", {
+        error: result.error,
+        reason: salonId ? "supabase error" : "salonId mancante",
+        salonId,
+      });
       setToast("Errore ripristino impostazioni AI");
       return;
     }

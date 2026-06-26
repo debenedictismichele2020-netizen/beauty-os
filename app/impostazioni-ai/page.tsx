@@ -13,6 +13,8 @@ export const metadata: Metadata = {
 export default async function ImpostazioniAiPage() {
   const currentSalon = await getCurrentSalon();
 
+  console.log("AI_SETTINGS_PAGE_CURRENT_SALON", currentSalon);
+
   return (
     <PageShell
       active="Impostazioni AI"

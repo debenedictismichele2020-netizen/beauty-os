@@ -348,7 +348,10 @@ async function upsertAiSettingsToSupabase(
   const supabase = createSupabaseBrowserClient();
 
   if (!salonId) {
-    console.error("AI_SETTINGS_SAVE_ERROR", "salonId mancante");
+    console.error("AI_SETTINGS_SAVE_ERROR", {
+      reason: "salonId mancante",
+      salonId,
+    });
     return {
       error: "salonId mancante",
       row: null,
@@ -357,7 +360,10 @@ async function upsertAiSettingsToSupabase(
   }
 
   if (!supabase) {
-    console.error("AI_SETTINGS_SAVE_ERROR", "Supabase non disponibile");
+    console.error("AI_SETTINGS_SAVE_ERROR", {
+      error: "Supabase non disponibile",
+      reason: "supabase error",
+    });
     return {
       error: "Supabase non disponibile",
       row: null,
@@ -367,6 +373,17 @@ async function upsertAiSettingsToSupabase(
 
   const normalizedSettings = normalizeAiSettings(settings);
   const settingsRow = toAiSettingsRow(normalizedSettings, salonId);
+
+  console.log("AI_SETTINGS_SAVE_PAYLOAD", {
+    businessSignature: settingsRow.business_signature,
+    creativity: settingsRow.creativity,
+    emojiStyle: settingsRow.emoji_style,
+    messageLength: settingsRow.message_length,
+    preferences: settingsRow.preferences,
+    salonId,
+    tone: settingsRow.tone,
+  });
+
   const { data: savedRow, error } = await supabase
     .from("salon_ai_settings")
     .upsert(settingsRow, { onConflict: "salon_id" })
@@ -374,13 +391,18 @@ async function upsertAiSettingsToSupabase(
     .maybeSingle();
 
   if (error) {
-    console.error("AI_SETTINGS_SAVE_ERROR", error);
+    console.error("AI_SETTINGS_SAVE_ERROR", {
+      error,
+      reason: "supabase error",
+    });
     return {
       error: error.message,
       row: null,
       success: false,
     };
   }
+
+  console.log("AI_SETTINGS_SAVE_SUCCESS", savedRow);
 
   return {
     error: null,
@@ -438,7 +460,11 @@ export async function saveAiSettings(
   if (!saveResult.success) {
     const error = saveResult.error ?? "Errore salvataggio impostazioni AI.";
 
-    console.error("AI_SETTINGS_SAVE_ERROR", error);
+    console.error("AI_SETTINGS_SAVE_ERROR", {
+      error,
+      reason: salonId ? "supabase error" : "salonId mancante",
+      salonId,
+    });
 
     return {
       error,
