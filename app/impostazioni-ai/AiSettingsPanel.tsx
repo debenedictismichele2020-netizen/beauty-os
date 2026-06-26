@@ -150,7 +150,7 @@ function buildPreviewMessage(settings: AiGenerationSettings) {
   return baseMessage;
 }
 
-export default function AiSettingsPanel() {
+export default function AiSettingsPanel({ salonId }: { salonId: string }) {
   const [settings, setSettings] = useState<AiGenerationSettings>(defaultAiSettings);
   const [toast, setToast] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -159,12 +159,12 @@ export default function AiSettingsPanel() {
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void (async () => {
-        setSettings(await readAiSettings());
+        setSettings(await readAiSettings(salonId));
       })();
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, []);
+  }, [salonId]);
 
   useEffect(() => {
     if (!toast) {
@@ -190,7 +190,7 @@ export default function AiSettingsPanel() {
     setIsSaving(true);
 
     const saveOperation = saveQueueRef.current.then(() =>
-      saveAiSettings(optimisticSettings),
+      saveAiSettings(optimisticSettings, salonId),
     );
 
     saveQueueRef.current = saveOperation.then(
@@ -228,7 +228,7 @@ export default function AiSettingsPanel() {
   async function restoreDefaultSettings() {
     setIsSaving(true);
 
-    const saveOperation = saveQueueRef.current.then(() => resetAiSettings());
+    const saveOperation = saveQueueRef.current.then(() => resetAiSettings(salonId));
 
     saveQueueRef.current = saveOperation.then(
       () => undefined,

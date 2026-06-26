@@ -1,5 +1,4 @@
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
-import { ensureCurrentUserSalon } from "@/lib/auth";
 
 export const aiToneStorageKey = "beauty_os_ai_tone";
 export const aiMessageLengthStorageKey = "beauty_os_ai_message_length";
@@ -182,8 +181,8 @@ export function normalizeAiSettings(
   };
 }
 
-export async function readAiSettings(): Promise<AiGenerationSettings> {
-  const remoteResult = await readAiSettingsFromSupabase();
+export async function readAiSettings(salonId?: string): Promise<AiGenerationSettings> {
+  const remoteResult = await readAiSettingsFromSupabase(salonId);
 
   if (remoteResult?.source === "supabase") {
     writeAiSettingsCache(remoteResult.settings);
@@ -196,7 +195,11 @@ export async function readAiSettings(): Promise<AiGenerationSettings> {
       ? readAiSettingsFromLocalStorage()
       : defaultAiSettings;
 
-    const saveResult = await saveAiSettings(fallbackSettings);
+    if (!salonId) {
+      return fallbackSettings;
+    }
+
+    const saveResult = await saveAiSettings(fallbackSettings, salonId);
 
     return saveResult.saved ? saveResult.settings : fallbackSettings;
   }
@@ -293,24 +296,24 @@ function toAiSettingsRow(settings: AiGenerationSettings, salonId: string) {
   };
 }
 
-async function readAiSettingsFromSupabase(): Promise<AiSettingsReadResult | null> {
+async function readAiSettingsFromSupabase(
+  salonId?: string,
+): Promise<AiSettingsReadResult | null> {
   const supabase = createSupabaseBrowserClient();
 
   if (!supabase) {
     return null;
   }
 
+  if (!salonId) {
+    return null;
+  }
+
   try {
-    const currentSalon = await ensureCurrentUserSalon();
-
-    if (!currentSalon) {
-      return null;
-    }
-
     const { data, error } = await supabase
       .from("salon_ai_settings")
       .select("*")
-      .eq("salon_id", currentSalon.id)
+      .eq("salon_id", salonId)
       .order("created_at", { ascending: true })
       .limit(1);
 
@@ -340,20 +343,30 @@ async function readAiSettingsFromSupabase(): Promise<AiSettingsReadResult | null
 
 async function upsertAiSettingsToSupabase(
   settings: AiGenerationSettings,
+  salonId: string,
 ): Promise<AiSettingsUpsertResult> {
   const supabase = createSupabaseBrowserClient();
-  const currentSalon = await ensureCurrentUserSalon();
 
-  if (!supabase || !currentSalon) {
+  if (!salonId) {
+    console.error("AI_SETTINGS_SAVE_ERROR", "salonId mancante");
     return {
-      error: "Supabase o salone corrente non disponibile.",
+      error: "salonId mancante",
+      row: null,
+      success: false,
+    };
+  }
+
+  if (!supabase) {
+    console.error("AI_SETTINGS_SAVE_ERROR", "Supabase non disponibile");
+    return {
+      error: "Supabase non disponibile",
       row: null,
       success: false,
     };
   }
 
   const normalizedSettings = normalizeAiSettings(settings);
-  const settingsRow = toAiSettingsRow(normalizedSettings, currentSalon.id);
+  const settingsRow = toAiSettingsRow(normalizedSettings, salonId);
   const { data: savedRow, error } = await supabase
     .from("salon_ai_settings")
     .upsert(settingsRow, { onConflict: "salon_id" })
@@ -405,6 +418,7 @@ function writeAiSettingsCache(settings: AiGenerationSettings) {
 
 export async function saveAiSettings(
   settings: AiGenerationSettings,
+  salonId: string,
   options: { syncRemote?: boolean } = {},
 ): Promise<AiSettingsSaveResult> {
   const normalizedSettings = normalizeAiSettings(settings);
@@ -419,7 +433,7 @@ export async function saveAiSettings(
     };
   }
 
-  const saveResult = await upsertAiSettingsToSupabase(normalizedSettings);
+  const saveResult = await upsertAiSettingsToSupabase(normalizedSettings, salonId);
 
   if (!saveResult.success) {
     const error = saveResult.error ?? "Errore salvataggio impostazioni AI.";
@@ -433,7 +447,7 @@ export async function saveAiSettings(
     };
   }
 
-  const remoteResult = await readAiSettingsFromSupabase();
+  const remoteResult = await readAiSettingsFromSupabase(salonId);
   const confirmedSettings =
     remoteResult?.source === "supabase"
       ? remoteResult.settings
@@ -456,6 +470,6 @@ export async function saveAiSettings(
   };
 }
 
-export async function resetAiSettings() {
-  return saveAiSettings(defaultAiSettings);
+export async function resetAiSettings(salonId: string) {
+  return saveAiSettings(defaultAiSettings, salonId);
 }
