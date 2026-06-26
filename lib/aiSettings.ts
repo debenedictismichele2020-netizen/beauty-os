@@ -354,52 +354,24 @@ async function upsertAiSettingsToSupabase(
 
   const normalizedSettings = normalizeAiSettings(settings);
   const settingsRow = toAiSettingsRow(normalizedSettings, currentSalon.id);
-  const { data: updatedRows, error: updateError } = await supabase
+  const { data: savedRow, error } = await supabase
     .from("salon_ai_settings")
-    .update(settingsRow)
-    .eq("salon_id", currentSalon.id)
+    .upsert(settingsRow, { onConflict: "salon_id" })
     .select("*")
-    .limit(1);
+    .maybeSingle();
 
-  if (updateError) {
-    console.error("AI_SETTINGS_SAVE_ERROR", updateError);
+  if (error) {
+    console.error("AI_SETTINGS_SAVE_ERROR", error);
     return {
-      error: updateError.message,
+      error: error.message,
       row: null,
       success: false,
     };
   }
-
-  const updatedRow = updatedRows?.[0] as SalonAiSettingsRow | undefined;
-
-  if (updatedRow) {
-    return {
-      error: null,
-      row: updatedRow,
-      success: true,
-    };
-  }
-
-  const { data: insertedRows, error: insertError } = await supabase
-    .from("salon_ai_settings")
-    .insert(settingsRow)
-    .select("*")
-    .limit(1);
-
-  if (insertError) {
-    console.error("AI_SETTINGS_SAVE_ERROR", insertError);
-    return {
-      error: insertError.message,
-      row: null,
-      success: false,
-    };
-  }
-
-  const insertedRow = insertedRows?.[0] as SalonAiSettingsRow | undefined;
 
   return {
     error: null,
-    row: insertedRow ?? null,
+    row: (savedRow as SalonAiSettingsRow | null) ?? null,
     success: true,
   };
 }
