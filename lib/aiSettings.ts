@@ -384,29 +384,60 @@ async function upsertAiSettingsToSupabase(
     tone: settingsRow.tone,
   });
 
-  const { data: savedRow, error } = await supabase
+  const { data: updatedRows, error: updateError } = await supabase
     .from("salon_ai_settings")
-    .upsert(settingsRow, { onConflict: "salon_id" })
+    .update(settingsRow)
+    .eq("salon_id", salonId)
     .select("*")
-    .maybeSingle();
+    .limit(1);
 
-  if (error) {
+  if (updateError) {
     console.error("AI_SETTINGS_SAVE_ERROR", {
-      error,
+      error: updateError,
       reason: "supabase error",
     });
     return {
-      error: error.message,
+      error: updateError.message,
       row: null,
       success: false,
     };
   }
 
-  console.log("AI_SETTINGS_SAVE_SUCCESS", savedRow);
+  const updatedRow = updatedRows?.[0] as SalonAiSettingsRow | undefined;
+
+  if (updatedRow) {
+    console.log("AI_SETTINGS_SAVE_SUCCESS", updatedRow);
+
+    return {
+      error: null,
+      row: updatedRow,
+      success: true,
+    };
+  }
+
+  const { data: insertedRow, error: insertError } = await supabase
+    .from("salon_ai_settings")
+    .insert(settingsRow)
+    .select("*")
+    .maybeSingle();
+
+  if (insertError) {
+    console.error("AI_SETTINGS_SAVE_ERROR", {
+      error: insertError,
+      reason: "supabase error",
+    });
+    return {
+      error: insertError.message,
+      row: null,
+      success: false,
+    };
+  }
+
+  console.log("AI_SETTINGS_SAVE_SUCCESS", insertedRow);
 
   return {
     error: null,
-    row: (savedRow as SalonAiSettingsRow | null) ?? null,
+    row: (insertedRow as SalonAiSettingsRow | null) ?? null,
     success: true,
   };
 }
