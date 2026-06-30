@@ -9,11 +9,11 @@ import {
   isMobileDevice,
 } from "@/lib/whatsapp";
 import {
-  completeOperationalTask,
+  completeOperationalTaskForSalon,
   type OperationalTask,
-  readOperationalTasks,
-  snoozeOperationalTask,
-  upsertOperationalTask,
+  readOperationalTasksForSalon,
+  snoozeOperationalTaskForSalon,
+  upsertOperationalTaskForSalon,
 } from "@/lib/operationalTasks";
 
 export type AgendaTask = {
@@ -631,7 +631,13 @@ function DrawerTaskCard({
   );
 }
 
-export function AgendaCalendar({ tasks }: { tasks: AgendaTask[] }) {
+export function AgendaCalendar({
+  salonId,
+  tasks,
+}: {
+  salonId: string;
+  tasks: AgendaTask[];
+}) {
   const today = useMemo(() => new Date(), []);
   const todayKey = toDateKey(today);
   const [visibleMonth, setVisibleMonth] = useState(
@@ -650,14 +656,18 @@ export function AgendaCalendar({ tasks }: { tasks: AgendaTask[] }) {
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      setCompletedTaskIds(
-        new Set([...readCompletedTasks(), ...readCompletedBirthdayTasks()]),
-      );
-      setOperationalTasks(readOperationalTasks());
+      void (async () => {
+        const nextOperationalTasks = await readOperationalTasksForSalon(salonId);
+
+        setCompletedTaskIds(
+          new Set([...readCompletedTasks(), ...readCompletedBirthdayTasks()]),
+        );
+        setOperationalTasks(nextOperationalTasks);
+      })();
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, []);
+  }, [salonId]);
 
   const monthCells = useMemo(() => getMonthCells(visibleMonth), [visibleMonth]);
   const distributedByDate = useMemo(
@@ -674,7 +684,7 @@ export function AgendaCalendar({ tasks }: { tasks: AgendaTask[] }) {
       const filteredTasks = dayTasks.filter((task) => {
         const operationalTask = operationalTasksById.get(getOperationalTaskId(task));
 
-        return !operationalTask || operationalTask.status === "completed";
+        return !operationalTask;
       });
 
       if (filteredTasks.length > 0) {
@@ -785,7 +795,7 @@ export function AgendaCalendar({ tasks }: { tasks: AgendaTask[] }) {
     setDrawerOpen(true);
   }
 
-  function completeTask(task: ScheduledTask) {
+  async function completeTask(task: ScheduledTask) {
     const taskId = getStableTaskId(task);
     const operationalTaskId = getOperationalTaskId(task);
 
@@ -801,22 +811,11 @@ export function AgendaCalendar({ tasks }: { tasks: AgendaTask[] }) {
       const nextTaskIds = new Set(currentTaskIds);
 
       nextTaskIds.add(taskId);
-      if (task.category === "Compleanno") {
-        const nextBirthdayTaskIds = readCompletedBirthdayTasks();
-
-        nextBirthdayTaskIds.add(taskId);
-        saveCompletedBirthdayTasks(nextBirthdayTaskIds);
-      } else {
-        const nextAgendaTaskIds = readCompletedTasks();
-
-        nextAgendaTaskIds.add(taskId);
-        saveCompletedTasks(nextAgendaTaskIds);
-      }
 
       return nextTaskIds;
     });
 
-    upsertOperationalTask({
+    await upsertOperationalTaskForSalon({
       customerId: task.customerId,
       customerName: task.customerName,
       date: task.dateKey,
@@ -829,12 +828,12 @@ export function AgendaCalendar({ tasks }: { tasks: AgendaTask[] }) {
       profileHref: task.customerId ? `/clients/${task.customerId}` : undefined,
       reason: task.reason ?? task.description,
       recoveryProbability: task.recoveryProbability ?? 0,
-      status: "pending",
+      status: "completed",
       title: task.title,
       type: getOperationalType(task),
-    });
-    completeOperationalTask(operationalTaskId);
-    setOperationalTasks(readOperationalTasks());
+    }, salonId);
+    await completeOperationalTaskForSalon(operationalTaskId, salonId);
+    setOperationalTasks(await readOperationalTasksForSalon(salonId));
 
     window.setTimeout(() => {
       setRecentlyCompletedTaskIds((currentTaskIds) => {
@@ -847,11 +846,11 @@ export function AgendaCalendar({ tasks }: { tasks: AgendaTask[] }) {
     }, 650);
   }
 
-  function snoozeTask(task: ScheduledTask) {
+  async function snoozeTask(task: ScheduledTask) {
     const operationalTaskId = getOperationalTaskId(task);
     const nextDate = getNextDateKey(task.dateKey);
 
-    upsertOperationalTask({
+    await upsertOperationalTaskForSalon({
       customerId: task.customerId,
       customerName: task.customerName,
       date: task.dateKey,
@@ -867,9 +866,9 @@ export function AgendaCalendar({ tasks }: { tasks: AgendaTask[] }) {
       status: "pending",
       title: task.title,
       type: getOperationalType(task),
-    });
-    snoozeOperationalTask(operationalTaskId, nextDate);
-    setOperationalTasks(readOperationalTasks());
+    }, salonId);
+    await snoozeOperationalTaskForSalon(operationalTaskId, nextDate, salonId);
+    setOperationalTasks(await readOperationalTasksForSalon(salonId));
   }
 
   function copySuggestedMessage(task: ScheduledTask) {
@@ -1202,9 +1201,13 @@ export function AgendaCalendar({ tasks }: { tasks: AgendaTask[] }) {
                         completing={recentlyCompletedTaskIds.has(taskId)}
                         copied={copiedTaskId === taskId}
                         key={`${task.id}-${task.dateKey}`}
-                        onComplete={() => completeTask(task)}
+                        onComplete={() => {
+                          void completeTask(task);
+                        }}
                         onCopy={() => copySuggestedMessage(task)}
-                        onSnooze={() => snoozeTask(task)}
+                        onSnooze={() => {
+                          void snoozeTask(task);
+                        }}
                         task={task}
                       />
                     );

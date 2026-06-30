@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { getCurrentSalon } from "@/lib/currentSalon";
 import { buildFinalWhatsAppMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
 import { PageHeader, PageShell } from "../components/BeautyUi";
 import {
@@ -301,6 +302,7 @@ function buildAgendaTasks(
 }
 
 export default async function AgendaAiPage() {
+  const currentSalon = await getCurrentSalon();
   const customers = await getCustomers();
   const tasks = buildAgendaTasks(customers);
 
@@ -317,8 +319,21 @@ export default async function AgendaAiPage() {
       />
 
       <div className="py-6">
-        {tasks.length > 0 ? (
-          <AgendaCalendar tasks={tasks} />
+        {!currentSalon ? (
+          <section className="rounded-[1.75rem] border border-black/10 bg-white p-8 shadow-[0_24px_80px_rgba(0,0,0,0.08)]">
+            <p className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-400">
+              Calendario operativo
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-black">
+              Salone non trovato
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-500">
+              Non è stato possibile recuperare il salone corrente. Effettua di nuovo
+              l’accesso e riprova.
+            </p>
+          </section>
+        ) : tasks.length > 0 ? (
+          <AgendaCalendar salonId={currentSalon.id} tasks={tasks} />
         ) : (
           <section className="rounded-[1.75rem] border border-black/10 bg-white p-8 shadow-[0_24px_80px_rgba(0,0,0,0.08)]">
             <p className="text-xs font-medium uppercase tracking-[0.22em] text-zinc-400">

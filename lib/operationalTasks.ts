@@ -291,6 +291,145 @@ async function upsertOperationalTasksToSupabase(tasks: OperationalTask[]) {
   }
 }
 
+function writeOperationalTasksCache(tasks: OperationalTask[]) {
+  if (!canUseStorage()) {
+    return;
+  }
+
+  window.localStorage.setItem(
+    operationalTasksStorageKey,
+    JSON.stringify(tasks.map((task) => normalizeTask(task))),
+  );
+  window.dispatchEvent(new Event("beauty-os-operational-tasks-updated"));
+}
+
+async function upsertOperationalTasksToSupabaseForSalon(
+  tasks: OperationalTask[],
+  salonId: string,
+) {
+  const supabase = createSupabaseBrowserClient();
+
+  if (!supabase || !salonId || tasks.length === 0) {
+    return false;
+  }
+
+  const normalizedTasks = tasks.map((task) => normalizeTask(task));
+  const { error } = await supabase
+    .from("operational_tasks")
+    .upsert(normalizedTasks.map((task) => toTaskRow(task, salonId)), {
+      onConflict: "salon_id,local_task_id",
+    });
+
+  if (error) {
+    console.warn("Fallback localStorage operational_tasks:", error.message);
+    return false;
+  }
+
+  writeOperationalTasksCache(normalizedTasks);
+
+  return true;
+}
+
+export async function readOperationalTasksForSalon(salonId: string) {
+  const supabase = createSupabaseBrowserClient();
+
+  if (!supabase || !salonId) {
+    return readOperationalTasksFromLocalStorage();
+  }
+
+  const { data, error } = await supabase
+    .from("operational_tasks")
+    .select("*")
+    .eq("salon_id", salonId)
+    .order("date", { ascending: true });
+
+  if (error) {
+    console.warn("Fallback localStorage operational_tasks:", error.message);
+    return readOperationalTasksFromLocalStorage();
+  }
+
+  const remoteTasks = (data ?? []).flatMap((row) => {
+    const task = normalizeTaskRow(row as OperationalTaskRow);
+
+    return task ? [task] : [];
+  });
+
+  writeOperationalTasksCache(remoteTasks);
+  return remoteTasks;
+}
+
+export async function saveOperationalTasksForSalon(
+  tasks: OperationalTask[],
+  salonId: string,
+) {
+  const normalizedTasks = tasks.map((task) => normalizeTask(task));
+  const didSaveRemote = await upsertOperationalTasksToSupabaseForSalon(
+    normalizedTasks,
+    salonId,
+  );
+
+  if (!didSaveRemote) {
+    writeOperationalTasksCache(normalizedTasks);
+  }
+}
+
+export async function upsertOperationalTaskForSalon(
+  task: OperationalTaskInput,
+  salonId: string,
+) {
+  const currentTasks = await readOperationalTasksForSalon(salonId);
+  const existingTask = currentTasks.find((currentTask) => currentTask.id === task.id);
+  const nextTask = normalizeTask({
+    ...existingTask,
+    ...task,
+    createdAt: existingTask?.createdAt ?? task.createdAt,
+  });
+  const nextTasks = existingTask
+    ? currentTasks.map((currentTask) =>
+        currentTask.id === nextTask.id ? nextTask : currentTask,
+      )
+    : [...currentTasks, nextTask];
+
+  await saveOperationalTasksForSalon(nextTasks, salonId);
+
+  return nextTask;
+}
+
+export async function completeOperationalTaskForSalon(
+  taskId: string,
+  salonId: string,
+) {
+  const currentTasks = await readOperationalTasksForSalon(salonId);
+  const now = new Date().toISOString();
+  const nextTasks = currentTasks.map((task) =>
+    task.id === taskId
+      ? { ...task, status: "completed" as const, updatedAt: now }
+      : task,
+  );
+
+  await saveOperationalTasksForSalon(nextTasks, salonId);
+
+  return nextTasks.find((task) => task.id === taskId) ?? null;
+}
+
+export async function snoozeOperationalTaskForSalon(
+  taskId: string,
+  nextDate: string,
+  salonId: string,
+) {
+  const currentTasks = await readOperationalTasksForSalon(salonId);
+  const now = new Date().toISOString();
+  const nextTasks = currentTasks.map((task) =>
+    task.id === taskId
+      ? { ...task, date: nextDate, status: "snoozed" as const, updatedAt: now }
+      : task,
+  );
+
+  await saveOperationalTasksForSalon(nextTasks, salonId);
+
+  return nextTasks.find((task) => task.id === taskId) ?? null;
+}
+
 export function getTodayDateKey() {
   const today = new Date();
   const year = today.getFullYear();
@@ -310,17 +449,9 @@ export function saveOperationalTasks(
   tasks: OperationalTask[],
   options: { syncRemote?: boolean } = {},
 ) {
-  if (!canUseStorage()) {
-    return;
-  }
-
   const normalizedTasks = tasks.map((task) => normalizeTask(task));
 
-  window.localStorage.setItem(
-    operationalTasksStorageKey,
-    JSON.stringify(normalizedTasks),
-  );
-  window.dispatchEvent(new Event("beauty-os-operational-tasks-updated"));
+  writeOperationalTasksCache(normalizedTasks);
 
   if (options.syncRemote !== false) {
     void upsertOperationalTasksToSupabase(normalizedTasks);
