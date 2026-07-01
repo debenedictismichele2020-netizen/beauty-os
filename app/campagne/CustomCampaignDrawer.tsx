@@ -20,6 +20,10 @@ import {
   type AiGenerationSettings,
 } from "@/lib/aiSettings";
 import {
+  markCampaignCustomerContacted,
+  readContactedCampaignCustomersForSalon,
+} from "@/lib/campaignContactedCustomers";
+import {
   generateCustomAiCampaign,
   getCustomCampaignSelectedCustomers,
   type CampaignCustomerPreview,
@@ -50,8 +54,6 @@ type CustomCampaignDraft = {
 };
 
 const customCampaignDraftStorageKey = "beauty_os_custom_campaign_draft";
-const contactedCustomersStorageKey = "beauty_os_contacted_campaign_customers";
-
 const emptyCampaign: GenerateCampaignResult = {
   campaignName: "",
   customers: [],
@@ -117,29 +119,7 @@ function getContactedCustomerKey(campaignName: string, customerId: string) {
   return `custom:${campaignName}:${customerId}`;
 }
 
-function readContactedCustomers() {
-  try {
-    const storedValue = window.localStorage.getItem(contactedCustomersStorageKey);
-    const parsedValue = storedValue ? JSON.parse(storedValue) : [];
-
-    return new Set(
-      Array.isArray(parsedValue)
-        ? parsedValue.filter((item): item is string => typeof item === "string")
-        : [],
-    );
-  } catch {
-    return new Set<string>();
-  }
-}
-
-function saveContactedCustomers(customerKeys: Set<string>) {
-  window.localStorage.setItem(
-    contactedCustomersStorageKey,
-    JSON.stringify([...customerKeys]),
-  );
-}
-
-export default function CustomCampaignDrawer() {
+export default function CustomCampaignDrawer({ salonId }: { salonId: string }) {
   const searchParams = useSearchParams();
   const [isOpen, setIsOpen] = useState(false);
   const [catalog, setCatalog] = useState<ServiceCatalogItem[]>([]);
@@ -187,7 +167,7 @@ export default function CustomCampaignDrawer() {
         setCatalog(activeCatalog);
         setSettings(aiSettings);
         setMessageTone(aiSettings.tone);
-        setContactedCustomers(readContactedCustomers());
+        setContactedCustomers(await readContactedCampaignCustomersForSalon(salonId));
 
         if (searchParams.get("new") === "1") {
           setIsOpen(true);
@@ -223,7 +203,7 @@ export default function CustomCampaignDrawer() {
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [loadCustomers, searchParams]);
+  }, [loadCustomers, salonId, searchParams]);
 
   const selectedServices = useMemo(
     () => catalog.filter((service) => selectedServiceIds.includes(service.id)),
@@ -318,14 +298,21 @@ export default function CustomCampaignDrawer() {
     setIsGenerating(false);
   }
 
-  function updateContacted(customerId: string) {
+  async function updateContacted(customerId: string) {
     const key = getContactedCustomerKey(campaignName, customerId);
+
+    await markCampaignCustomerContacted({
+      campaignName,
+      campaignType: segment,
+      contactKey: key,
+      customerId,
+      salonId,
+    });
 
     setContactedCustomers((currentKeys) => {
       const nextKeys = new Set(currentKeys);
 
       nextKeys.add(key);
-      saveContactedCustomers(nextKeys);
 
       return nextKeys;
     });
@@ -657,7 +644,7 @@ export default function CustomCampaignDrawer() {
                           <button
                             className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 disabled:bg-zinc-100 disabled:text-zinc-500"
                             disabled={isContacted}
-                            onClick={() => updateContacted(customer.id)}
+                            onClick={() => void updateContacted(customer.id)}
                             type="button"
                           >
                             {isContacted ? "Contattato" : "Segna contattato"}

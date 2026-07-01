@@ -20,6 +20,11 @@ import {
   type AiGenerationSettings,
 } from "@/lib/aiSettings";
 import {
+  markCampaignCustomerContacted,
+  readContactedCampaignCustomersForSalon,
+  unmarkCampaignCustomerContacted,
+} from "@/lib/campaignContactedCustomers";
+import {
   generateAiCampaign,
   getCampaignSelectedCustomers,
   type CampaignCustomerPreview,
@@ -38,11 +43,10 @@ type CampaignModalProps = {
   customerCount: number;
   objective: string;
   potentialValue: number;
+  salonId: string;
   segmentLabel: string;
   segmentStatus: CampaignSegmentStatus;
 };
-
-const contactedCustomersStorageKey = "beauty_os_contacted_campaign_customers";
 
 const emptyCampaign: GenerateCampaignResult = {
   success: false,
@@ -88,37 +92,6 @@ function getContactedCustomerKey(
   customerId: string,
 ) {
   return `${segmentStatus}:${customerId}`;
-}
-
-function readContactedCustomers() {
-  try {
-    const storedValue = window.localStorage.getItem(contactedCustomersStorageKey);
-
-    if (!storedValue) {
-      return new Set<string>();
-    }
-
-    const parsedValue = JSON.parse(storedValue);
-
-    if (!Array.isArray(parsedValue)) {
-      return new Set<string>();
-    }
-
-    return new Set(
-      parsedValue.filter((customerKey): customerKey is string =>
-        typeof customerKey === "string",
-      ),
-    );
-  } catch {
-    return new Set<string>();
-  }
-}
-
-function saveContactedCustomers(customerKeys: Set<string>) {
-  window.localStorage.setItem(
-    contactedCustomersStorageKey,
-    JSON.stringify([...customerKeys]),
-  );
 }
 
 function getOpportunityText(
@@ -295,6 +268,7 @@ export default function CampaignModal({
   customerCount,
   objective,
   potentialValue,
+  salonId,
   segmentLabel,
   segmentStatus,
 }: CampaignModalProps) {
@@ -318,14 +292,14 @@ export default function CampaignModal({
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       void (async () => {
-        setContactedCustomers(readContactedCustomers());
+        setContactedCustomers(await readContactedCampaignCustomersForSalon(salonId));
         setServiceCatalog(readServiceCatalog());
         setAiSettings(await readAiSettings());
       })();
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, []);
+  }, [salonId]);
 
   const progressCustomers = campaign.success && campaign.customers.length > 0
     ? campaign.customers
@@ -448,8 +422,23 @@ export default function CampaignModal({
     setCopyMessage("Messaggio copiato.");
   }
 
-  function updateContactedCustomer(customerId: string, shouldBeContacted: boolean) {
+  async function updateContactedCustomer(
+    customerId: string,
+    shouldBeContacted: boolean,
+  ) {
     const customerKey = getContactedCustomerKey(segmentStatus, customerId);
+
+    if (shouldBeContacted) {
+      await markCampaignCustomerContacted({
+        campaignName: campaign.campaignName || segmentLabel,
+        campaignType: segmentStatus,
+        contactKey: customerKey,
+        customerId,
+        salonId,
+      });
+    } else {
+      await unmarkCampaignCustomerContacted(salonId, customerKey);
+    }
 
     setContactedCustomers((currentCustomers) => {
       const nextCustomers = new Set(currentCustomers);
@@ -459,8 +448,6 @@ export default function CampaignModal({
       } else {
         nextCustomers.delete(customerKey);
       }
-
-      saveContactedCustomers(nextCustomers);
 
       return nextCustomers;
     });
@@ -748,14 +735,14 @@ export default function CampaignModal({
                             isContacted={false}
                             key={customer.id}
                             onContact={() =>
-                              updateContactedCustomer(customer.id, true)
+                              void updateContactedCustomer(customer.id, true)
                             }
                             onCopy={() => copyCustomerMessage(customer.message)}
                             onOpenWhatsApp={(finalMessage) =>
                               openWhatsApp(customer.phone, finalMessage)
                             }
                             onRestore={() =>
-                              updateContactedCustomer(customer.id, false)
+                              void updateContactedCustomer(customer.id, false)
                             }
                             selectedServices={generatedServiceNames}
                             settings={aiSettings}
@@ -778,14 +765,14 @@ export default function CampaignModal({
                             isContacted
                             key={customer.id}
                             onContact={() =>
-                              updateContactedCustomer(customer.id, true)
+                              void updateContactedCustomer(customer.id, true)
                             }
                             onCopy={() => copyCustomerMessage(customer.message)}
                             onOpenWhatsApp={(finalMessage) =>
                               openWhatsApp(customer.phone, finalMessage)
                             }
                             onRestore={() =>
-                              updateContactedCustomer(customer.id, false)
+                              void updateContactedCustomer(customer.id, false)
                             }
                             selectedServices={generatedServiceNames}
                             settings={aiSettings}

@@ -202,6 +202,8 @@ async function getCampaignSegmentSummaries() {
 }
 
 export default async function CampagnePage() {
+  const currentSalon = await getCurrentSalon();
+  const salonId = currentSalon?.id ?? "";
   const { ageSummaries, birthdaySummaries, missingBirthDateCount, segmentSummaries } =
     await getCampaignSegmentSummaries();
   const estimatedRecovery = campaignSegments.reduce(
@@ -233,7 +235,7 @@ export default async function CampagnePage() {
                 {estimatedRecovery > 0 ? formatCurrency(estimatedRecovery) : "-- €"}
               </span>
             </div>
-            <CustomCampaignDrawer />
+            <CustomCampaignDrawer salonId={salonId} />
           </div>
         }
         eyebrow="Centro marketing"
@@ -292,6 +294,7 @@ export default async function CampagnePage() {
                     customerCount={summary.customerCount}
                     objective={segment.objective}
                     potentialValue={summary.potentialValue}
+                    salonId={salonId}
                     segmentLabel={segment.label}
                     segmentStatus={segment.status}
                   />
@@ -364,6 +367,7 @@ export default async function CampagnePage() {
                             customerCount={summary.customerCount}
                             objective={segment.objective}
                             potentialValue={summary.potentialValue}
+                            salonId={salonId}
                             segmentLabel={segment.title}
                             segmentStatus={segment.status}
                           />
@@ -441,6 +445,7 @@ export default async function CampagnePage() {
                           customerCount={summary.customerCount}
                           objective={segment.objective}
                           potentialValue={summary.potentialValue}
+                          salonId={salonId}
                           segmentLabel={segment.title}
                           segmentStatus={segment.status}
                         />
