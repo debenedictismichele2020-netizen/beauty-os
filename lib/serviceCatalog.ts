@@ -12,8 +12,6 @@ export const serviceCategories = [
   "Viso",
   "Corpo",
   "Nails",
-  "Hair",
-  "Barber",
   "Relax",
   "Evento",
   "Altro",
@@ -35,6 +33,7 @@ type ServiceRow = {
   average_duration_minutes?: number | string | null;
   average_price?: number | string | null;
   category?: string | null;
+  deleted_at?: string | null;
   id?: string | null;
   local_service_id?: string | null;
   name?: string | null;
@@ -45,12 +44,14 @@ export const defaultServiceCatalog: ServiceCatalogItem[] = [
   createDefaultService("Trattamento viso", "Viso", 75, 60),
   createDefaultService("Pulizia viso", "Viso", 55, 45),
   createDefaultService("Laminazione ciglia", "Viso", 60, 60),
+  createDefaultService("Sopracciglia design", "Viso", 25, 25),
   createDefaultService("Trattamento corpo", "Corpo", 85, 75),
+  createDefaultService("Epilazione corpo", "Corpo", 45, 45),
   createDefaultService("Massaggio relax", "Relax", 70, 60),
   createDefaultService("Manicure", "Nails", 35, 45),
+  createDefaultService("Semipermanente mani", "Nails", 45, 60),
   createDefaultService("Pedicure", "Nails", 45, 50),
-  createDefaultService("Barba / grooming uomo", "Barber", 30, 30),
-  createDefaultService("Pacchetto sposa", "Evento", 250, 180),
+  createDefaultService("Pacchetto beauty evento", "Evento", 160, 120),
   createDefaultService("Check-up beauty", "Altro", 40, 30),
 ];
 
@@ -90,6 +91,10 @@ export function normalizeServiceName(service: string) {
 }
 
 function normalizeServiceCategory(category: unknown): ServiceCategory {
+  if (category === "Hair" || category === "Barber") {
+    return "Altro";
+  }
+
   return serviceCategories.includes(category as ServiceCategory)
     ? (category as ServiceCategory)
     : "Altro";
@@ -435,6 +440,145 @@ async function syncSavedCatalogToSupabase(services: ServiceCatalogItem[]) {
   }
 }
 
+async function upsertServicesToSupabaseForSalon(
+  services: ServiceCatalogItem[],
+  salonId: string,
+) {
+  const supabase = createSupabaseBrowserClient();
+
+  if (!supabase || !salonId) {
+    return false;
+  }
+
+  const normalizedServices = normalizeServiceCatalog(services);
+  const { error } = await supabase
+    .from("services")
+    .upsert(normalizedServices.map((service) => toServiceRow(service, salonId)), {
+      onConflict: "salon_id,local_service_id",
+    });
+
+  if (error) {
+    console.error("SERVICE_CATALOG_SAVE_ERROR", error);
+    return false;
+  }
+
+  return true;
+}
+
+function writeServiceCatalogCache(services: ServiceCatalogItem[]) {
+  if (!canUseStorage()) {
+    return;
+  }
+
+  window.localStorage.setItem(
+    serviceCatalogStorageKey,
+    JSON.stringify(dedupeCatalog(services)),
+  );
+}
+
+export async function readServiceCatalogForSalon(salonId: string) {
+  const supabase = createSupabaseBrowserClient();
+
+  if (!supabase || !salonId) {
+    return readServiceCatalogFromLocalStorage();
+  }
+
+  const { data, error } = await supabase
+    .from("services")
+    .select("*")
+    .eq("salon_id", salonId)
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("SERVICE_CATALOG_SAVE_ERROR", error);
+    return readServiceCatalogFromLocalStorage();
+  }
+
+  const remoteServices = normalizeServiceCatalog(
+    (data ?? []).flatMap((row) => {
+      const serviceRow = row as ServiceRow;
+
+      if (serviceRow.deleted_at) {
+        return [];
+      }
+
+      const service = normalizeServiceRow(serviceRow);
+
+      return service ? [service] : [];
+    }),
+  );
+
+  if (remoteServices.length > 0) {
+    writeServiceCatalogCache(remoteServices);
+    return remoteServices;
+  }
+
+  if ((data ?? []).length === 0) {
+    writeServiceCatalogCache(defaultServiceCatalog);
+    return defaultServiceCatalog;
+  }
+
+  writeServiceCatalogCache([]);
+  return [];
+}
+
+export async function saveServiceCatalogForSalon(
+  services: ServiceCatalogItem[],
+  salonId: string,
+) {
+  const normalizedServices = normalizeServiceCatalog(services);
+  const supabase = createSupabaseBrowserClient();
+
+  if (!supabase || !salonId) {
+    writeServiceCatalogCache(normalizedServices);
+    return false;
+  }
+
+  const didSaveRemote = await upsertServicesToSupabaseForSalon(
+    normalizedServices,
+    salonId,
+  );
+
+  if (!didSaveRemote) {
+    writeServiceCatalogCache(normalizedServices);
+    return false;
+  }
+
+  const activeLocalIds = new Set(normalizedServices.map((service) => service.id));
+  const { data, error } = await supabase
+    .from("services")
+    .select("local_service_id")
+    .eq("salon_id", salonId)
+    .is("deleted_at", null);
+
+  if (error) {
+    console.error("SERVICE_CATALOG_SAVE_ERROR", error);
+    writeServiceCatalogCache(normalizedServices);
+    return false;
+  }
+
+  const removedServiceIds = (data ?? [])
+    .map((row) => String(row.local_service_id ?? ""))
+    .filter((serviceId) => serviceId && !activeLocalIds.has(serviceId));
+
+  if (removedServiceIds.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("services")
+      .update({ deleted_at: new Date().toISOString(), active: false })
+      .eq("salon_id", salonId)
+      .in("local_service_id", removedServiceIds);
+
+    if (deleteError) {
+      console.error("SERVICE_CATALOG_SAVE_ERROR", deleteError);
+      writeServiceCatalogCache(normalizedServices);
+      return false;
+    }
+  }
+
+  writeServiceCatalogCache(normalizedServices);
+  return true;
+}
+
 export function readServiceCatalog() {
   scheduleServiceCatalogHydration();
 
@@ -449,10 +593,7 @@ export function saveServiceCatalog(
     return;
   }
 
-  window.localStorage.setItem(
-    serviceCatalogStorageKey,
-    JSON.stringify(dedupeCatalog(services)),
-  );
+  writeServiceCatalogCache(services);
 
   if (options.syncRemote !== false) {
     void syncSavedCatalogToSupabase(services);

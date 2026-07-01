@@ -80,6 +80,7 @@ async function getCatalogAppointmentUsage() {
 }
 
 export default async function CatalogoPage() {
+  const currentSalon = await getCurrentSalon();
   const appointmentUsage = await getCatalogAppointmentUsage();
 
   return (
@@ -88,7 +89,10 @@ export default async function CatalogoPage() {
       sidebarEyebrow="Catalogo"
       sidebarText="Gestisci servizi, prezzi e durata del tuo salone."
     >
-      <ServiceCatalogManager appointmentUsage={appointmentUsage} />
+      <ServiceCatalogManager
+        appointmentUsage={appointmentUsage}
+        salonId={currentSalon?.id ?? ""}
+      />
     </PageShell>
   );
 }

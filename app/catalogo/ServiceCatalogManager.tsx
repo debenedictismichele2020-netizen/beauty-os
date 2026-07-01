@@ -9,8 +9,8 @@ import {
   createServiceId,
   defaultServiceCatalog,
   normalizeServiceName,
-  readServiceCatalog,
-  saveServiceCatalog,
+  readServiceCatalogForSalon,
+  saveServiceCatalogForSalon,
   serviceCategories,
   type ServiceCatalogItem,
   type ServiceCategory,
@@ -129,8 +129,10 @@ function StatusButton({
 
 export default function ServiceCatalogManager({
   appointmentUsage,
+  salonId,
 }: {
   appointmentUsage: CatalogAppointmentUsage[];
+  salonId: string;
 }) {
   const router = useRouter();
   const [services, setServices] = useState<ServiceCatalogItem[]>(defaultServiceCatalog);
@@ -146,11 +148,13 @@ export default function ServiceCatalogManager({
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      setServices(readServiceCatalog());
+      void (async () => {
+        setServices(await readServiceCatalogForSalon(salonId));
+      })();
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, []);
+  }, [salonId]);
 
   useEffect(() => {
     if (!toast) {
@@ -336,9 +340,9 @@ export default function ServiceCatalogManager({
     });
   }, [categoryFilter, searchQuery, services, statusFilter]);
 
-  function persistServices(nextServices: ServiceCatalogItem[]) {
+  async function persistServices(nextServices: ServiceCatalogItem[]) {
+    await saveServiceCatalogForSalon(nextServices, salonId);
     setServices(nextServices);
-    saveServiceCatalog(nextServices);
   }
 
   function resetEditing() {
@@ -411,10 +415,10 @@ export default function ServiceCatalogManager({
     }
 
     if (isNewService) {
-      persistServices([toCatalogItem(form), ...services]);
+      void persistServices([toCatalogItem(form), ...services]);
       setToast("Servizio aggiunto");
     } else {
-      persistServices(
+      void persistServices(
         services.map((service) =>
           service.id === editingServiceId
             ? toCatalogItem(form, editingServiceId)
@@ -428,7 +432,7 @@ export default function ServiceCatalogManager({
   }
 
   function toggleService(serviceId: string) {
-    persistServices(
+    void persistServices(
       services.map((service) =>
         service.id === serviceId
           ? { ...service, active: !service.active }
@@ -439,7 +443,7 @@ export default function ServiceCatalogManager({
   }
 
   function deleteService(serviceId: string) {
-    persistServices(services.filter((service) => service.id !== serviceId));
+    void persistServices(services.filter((service) => service.id !== serviceId));
     setDeleteCandidateId("");
     resetEditing();
     setToast("Servizio eliminato");
